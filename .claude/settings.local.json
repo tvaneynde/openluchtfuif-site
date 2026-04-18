@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(unzip -o /Users/tomasvaneynde/Downloads/Openluchtfuif.zip -d /tmp/openluchtfuif)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}
