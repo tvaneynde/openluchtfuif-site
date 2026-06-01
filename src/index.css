@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: "Rugrats";
-  src: url("/assets/fonts/Rugrats.otf") format("opentype");
+  src: url("./assets/fonts/Rugrats.otf") format("opentype");
   font-display: swap;
 }
 
@@ -626,28 +626,23 @@ section { position: relative; padding: 120px 40px; }
 
 /* Early bird */
 .tkt-early {
-  background: var(--cream);
-  color: var(--purple-deep);
+  background: rgba(26,8,32,0.5);
+  color: var(--cream);
+  border: 1px solid rgba(244,231,208,.15);
 }
 
 /* Waves — featured */
 .tkt-waves {
-  background:
-    radial-gradient(ellipse at 10% 80%, rgba(240,122,60,.6) 0%, transparent 50%),
-    radial-gradient(ellipse at 90% 20%, rgba(217,90,43,.45) 0%, transparent 50%),
-    #4a1a3a;
+  background: rgba(26,8,32,0.5);
   color: var(--cream);
-  border: 1px solid rgba(244,231,208,.18);
-  transform: scale(1.03);
-  box-shadow: 0 32px 80px rgba(0,0,0,.4);
+  border: 1px solid rgba(240,122,60,.4);
 }
-.tkt-waves:hover { transform: scale(1.03) translateY(-6px); }
 
 /* Door */
 .tkt-door {
-  background: #5a2860;
+  background: rgba(26,8,32,0.5);
   color: var(--cream);
-  border: 1px solid rgba(244,231,208,.18);
+  border: 1px solid rgba(244,231,208,.15);
 }
 
 /* Shared internals */
@@ -691,7 +686,7 @@ section { position: relative; padding: 120px 40px; }
 
 .tkt-divider {
   border: none;
-  border-top: 1px dashed rgba(42,15,51,.25);
+  border-top: 1px dashed rgba(244,231,208,.2);
   margin: 20px 0;
 }
 
@@ -985,6 +980,47 @@ footer {
   z-index: 0;
 }
 
+/* ---- Mobile bottom nav ---- */
+.mobile-nav {
+  display: none; /* shown only on mobile via media query below */
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(26, 8, 32, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(244, 231, 208, 0.1);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  justify-content: space-around;
+  align-items: stretch;
+}
+.mobile-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  color: rgba(244, 231, 208, 0.55);
+  text-decoration: none;
+  padding: 6px 4px;
+  transition: color 0.2s;
+}
+.mobile-nav a.active {
+  color: var(--orange);
+}
+.mobile-nav-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.mobile-nav-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
   .edition-card.big, .edition-card.mid, .edition-card.small { grid-column: span 6; }
@@ -994,6 +1030,8 @@ footer {
   .info-grid { grid-template-columns: 1fr; }
   section { padding: 80px 20px; }
   .nav { display: none; }
+  .mobile-nav { display: flex; }
+  body { padding-bottom: 80px; }
   .lineup-row { grid-template-columns: 40px 1fr auto; gap: 12px; }
   .lineup-row .genre { display: none; }
 }
@@ -1065,20 +1103,17 @@ footer {
   animation: glow-pulse 3s ease-in-out infinite;
 }
 
-/* Early bird card float */
-.tkt-early {
-  animation: early-float 4s ease-in-out infinite;
-}
 
-/* Partner tiles bob with individual rotation preserved */
+/* Partner tiles — subtle static rotation + smooth hover */
 .partner-scatter-tile {
-  transform: rotate(var(--r,0deg)) translateY(var(--ty,0px));
-  animation: tile-bob 4s ease-in-out infinite;
-  animation-delay: var(--bob-delay, 0s);
+  transform: rotate(var(--r,0deg));
+  transition: transform 0.4s cubic-bezier(.2,.8,.2,1), border-color .3s, background .3s, box-shadow .3s;
 }
-/* override the hover transform to preserve rotation */
 .partner-scatter-tile:hover {
-  transform: rotate(var(--r,0deg)) translateY(calc(var(--ty,0px) - 6px)) !important;
+  transform: rotate(var(--r,0deg)) translateY(-8px);
+  border-color: rgba(240,122,60,.45) !important;
+  background: rgba(244,231,208,.09) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,.25);
 }
 
 /* Lineup rows stagger in when list mounts */
@@ -1087,18 +1122,13 @@ footer {
   animation-delay: calc(var(--i, 0) * 0.07s);
 }
 
-/* Info card shimmer on hover */
-.info-card { overflow: hidden; }
-.info-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 35%, rgba(244,231,208,.07) 50%, transparent 65%);
-  transform: translateX(-120%) skewX(-15deg);
-  pointer-events: none;
+/* Info card hover */
+.info-card {
+  transition: transform 0.3s ease, border-color 0.3s ease;
 }
-.info-card:hover::before {
-  animation: shimmer-slide 0.55s ease forwards;
+.info-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(240,122,60,.35);
 }
 
 /* FAQ item hover accent */

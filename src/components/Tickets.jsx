@@ -10,10 +10,10 @@ function TicketEarlyBird() {
         <span className="tkt-price">12</span>
       </div>
       <div className="tkt-divider" />
-      <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.65, margin: "4px 0 0", flex: 1 }}>
+      <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.7, margin: "4px 0 0", flex: 1 }}>
         De goedkoopste manier om erbij te zijn. Wie vroeg boekt, betaalt minder — zo simpel is het.
       </p>
-      <a href="#" className="tkt-btn tkt-btn-dark">Bestel nu →</a>
+      <a href="#/checkout" className="tkt-btn tkt-btn-cream">Bestel nu →</a>
     </div>
   );
 }
@@ -28,8 +28,8 @@ function TicketWaves() {
   return (
     <div className="tkt tkt-waves">
       <div className="tkt-top">
-        <div className="tkt-badge" style={{ background: "rgba(244,231,208,.15)", color: "var(--cream)" }}>Voorverkoop</div>
-        <div className="tkt-label mono" style={{ color: "rgba(244,231,208,.6)" }}>Prijs stijgt per golf</div>
+        <div className="tkt-badge">Voorverkoop</div>
+        <div className="tkt-label mono">Prijs stijgt per golf</div>
       </div>
       <div className="tkt-wave-list">
         {waves.map(w => (
@@ -42,8 +42,8 @@ function TicketWaves() {
           </div>
         ))}
       </div>
-      <div className="tkt-divider" style={{ borderColor: "rgba(244,231,208,.15)" }} />
-      <a href="#" className="tkt-btn tkt-btn-cream">Golf 3 kopen →</a>
+      <div className="tkt-divider" />
+      <a href="#/checkout" className="tkt-btn tkt-btn-cream">Golf 3 kopen →</a>
     </div>
   );
 }
@@ -52,18 +52,18 @@ function TicketDoor() {
   return (
     <div className="tkt tkt-door">
       <div className="tkt-top">
-        <div className="tkt-badge" style={{ background: "rgba(244,231,208,.08)", color: "rgba(244,231,208,.5)", border: "1px solid rgba(244,231,208,.15)" }}>Aan de kassa</div>
-        <div className="tkt-label mono" style={{ color: "rgba(244,231,208,.4)" }}>Als er nog plek is</div>
+        <div className="tkt-badge" style={{ background: "rgba(244,231,208,.12)", color: "rgba(244,231,208,.5)", border: "1px solid rgba(244,231,208,.15)" }}>Aan de kassa</div>
+        <div className="tkt-label mono">Als er nog plek is</div>
       </div>
-      <div className="tkt-price-block" style={{ opacity: 0.5 }}>
+      <div className="tkt-price-block" style={{ opacity: 0.45 }}>
         <span className="tkt-currency">€</span>
         <span className="tkt-price">20</span>
       </div>
-      <div className="tkt-divider" style={{ borderColor: "rgba(244,231,208,.1)" }} />
-      <p style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(244,231,208,.45)", marginBottom: 24 }}>
+      <div className="tkt-divider" />
+      <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.5, marginBottom: 24, flex: 1 }}>
         Contant betalen aan de ingang. Geen garantie op toegang — koop op voorhand om zeker te zijn van je plek.
       </p>
-      <a href="#tickets" className="tkt-btn" style={{ background: "transparent", border: "1px solid rgba(244,231,208,.2)", color: "rgba(244,231,208,.5)" }}>
+      <a href="#tickets" className="tkt-btn" style={{ background: "transparent", border: "1px solid rgba(244,231,208,.2)", color: "rgba(244,231,208,.4)" }}>
         Meer info
       </a>
     </div>
@@ -79,7 +79,7 @@ export default function Tickets() {
       </div>
 
       <p style={{ fontSize: 18, maxWidth: 640, marginBottom: 56, opacity: 0.85 }}>
-        Hoe vroeger, hoe goedkoper. Alle winsten gaan naar Jeugdhuis De Kluster Pellenberg.
+        Hoe vroeger, hoe goedkoper.
       </p>
 
       <div className="tickets-grid">

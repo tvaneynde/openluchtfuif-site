@@ -16,6 +16,31 @@ function smoothScrollTo(id, e) {
   requestAnimationFrame(step);
 }
 
+function MobileNav({ active }) {
+  const items = [
+    { id: 'home',    label: 'Home',     icon: '◉' },
+    { id: 'lineup',  label: 'Line-up',  icon: '♫' },
+    { id: 'tickets', label: 'Tickets',  icon: '⬡' },
+    { id: 'info',    label: 'Info',     icon: 'ℹ' },
+    { id: 'about',   label: 'Over ons', icon: '●' },
+  ];
+  return (
+    <nav className="mobile-nav">
+      {items.map(item => (
+        <a
+          key={item.id}
+          href={`#${item.id}`}
+          className={active === item.id ? 'active' : ''}
+          onClick={e => smoothScrollTo(item.id, e)}
+        >
+          <span className="mobile-nav-icon">{item.icon}</span>
+          <span className="mobile-nav-label">{item.label}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 export default function Nav({ active }) {
   const items = [
     ["home",     "Home"],
@@ -28,11 +53,14 @@ export default function Nav({ active }) {
     ["about",    "Over ons"],
   ];
   return (
-    <nav className="nav">
-      {items.map(([id, label]) => (
-        <a key={id} href={`#${id}`} className={active === id ? "active" : ""}
-          onClick={e => smoothScrollTo(id, e)}>{label}</a>
-      ))}
-    </nav>
+    <>
+      <nav className="nav">
+        {items.map(([id, label]) => (
+          <a key={id} href={`#${id}`} className={active === id ? "active" : ""}
+            onClick={e => smoothScrollTo(id, e)}>{label}</a>
+        ))}
+      </nav>
+      <MobileNav active={active} />
+    </>
   );
 }

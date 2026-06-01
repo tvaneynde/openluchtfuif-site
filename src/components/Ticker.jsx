@@ -2,7 +2,7 @@ export default function Ticker() {
   const items = [
     "◉ 29 Augustus 2026",
     "◉ Pellenberg — Jeugdhuis De Kluster",
-    "◉ 17:00 → 03:00",
+    "◉ 16:00 → 03:00",
     "◉ Vroegvogels nu te koop",
     "◉ Editie 14",
     "◉ Geen glas · Geen plastic · Alles herbruikbaar",

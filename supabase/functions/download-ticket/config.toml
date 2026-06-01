@@ -1,0 +1,2 @@
+[functions.download-ticket]
+verify_jwt = false

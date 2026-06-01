@@ -1,7 +1,4 @@
-import { useState } from "react";
-
 export default function Footer() {
-  const [email, setEmail] = useState("");
   return (
     <footer>
       <svg className="mega-wordmark" viewBox="0 0 1000 130" preserveAspectRatio="xMidYMid meet">
@@ -9,25 +6,7 @@ export default function Footer() {
           style={{ fontFamily: "var(--display)", fill: "var(--purple-soft)", opacity: 0.45, userSelect: "none" }}
         >OPENLUCHTFUIF</text>
       </svg>
-      <div className="footer-grid">
-        <div className="footer-col">
-          <h4>◉ Nieuwsbrief</h4>
-          <p style={{ fontSize: 14, opacity: 0.8, marginBottom: 12 }}>Geen spam. Alleen wanneer de line-up of tickets droppen.</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="email"
-              placeholder="mail@jou.be"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{
-                flex: 1, padding: "12px 16px", borderRadius: 999,
-                background: "transparent", border: "1px solid rgba(244,231,208,.3)",
-                color: "var(--cream)", fontFamily: "var(--body)"
-              }}
-            />
-            <button className="btn btn-primary">OK</button>
-          </div>
-        </div>
+      <div className="footer-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
         <div className="footer-col">
           <h4>◉ Navigatie</h4>
           <a href="#home">Home</a>
@@ -38,9 +17,7 @@ export default function Footer() {
         </div>
         <div className="footer-col">
           <h4>◉ Contact</h4>
-          <a href="mailto:info@openluchtfuif.be">info@openluchtfuif.be</a>
-          <a href="mailto:partners@openluchtfuif.be">partners@openluchtfuif.be</a>
-          <a href="mailto:vrijwilligers@openluchtfuif.be">Vrijwilliger worden</a>
+          <a href="mailto:openluchtfuif3212@gmail.com">openluchtfuif3212@gmail.com</a>
         </div>
         <div className="footer-col">
           <h4>◉ Sociaal</h4>
@@ -51,6 +28,10 @@ export default function Footer() {
       </div>
       <div className="footer-bottom">
         <div>© 2026 — Openluchtfuif Pellenberg VZW</div>
+        <a href="#/dashboard" style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.15em", color: "rgba(244,231,208,.3)", textDecoration: "none", transition: "color 0.2s" }}
+          onMouseEnter={e => e.currentTarget.style.color = "rgba(244,231,208,.7)"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(244,231,208,.3)"}
+        >DASHBOARD →</a>
       </div>
     </footer>
   );

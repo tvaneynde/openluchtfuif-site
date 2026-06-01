@@ -1,0 +1,2 @@
+[functions.mollie-webhook]
+verify_jwt = false
