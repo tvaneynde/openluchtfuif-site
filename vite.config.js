@@ -16,11 +16,11 @@ export default defineConfig({
         orientation: "portrait",
         background_color: "#1a0820",
         theme_color: "#1a0820",
-        start_url: "/openluchtfuif-site/#/scanner",
-        scope: "/openluchtfuif-site/",
+        start_url: "/#/scanner",
+        scope: "/",
         icons: [
-          { src: "/openluchtfuif-site/scanner-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: "/openluchtfuif-site/scanner-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: "/scanner-icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+          { src: "/scanner-icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
         ],
       },
       workbox: {
@@ -40,5 +40,5 @@ export default defineConfig({
       },
     }),
   ],
-  base: "/openluchtfuif-site",
+  base: "/",
 });
