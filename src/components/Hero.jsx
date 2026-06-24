@@ -15,7 +15,7 @@ export default function Hero() {
     <section className="hero" id="home" ref={heroRef}>
       <div className="hero-bg">
         <img
-          src={`${import.meta.env.BASE_URL}/assets/hero-dancers.png`}
+          src={`${import.meta.env.BASE_URL}assets/hero-dancers.png`}
           className="hero-fullbleed"
           style={{
             transform: `translateY(${offset * 0.25}px) scale(${1 + offset * 0.0002})`,

@@ -65,7 +65,7 @@ export default function App() {
             <div
               key={i}
               className="ph"
-              style={{ backgroundImage: `url(${import.meta.env.BASE_URL}/assets/${p}.jpg)` }}
+              style={{ backgroundImage: `url(${import.meta.env.BASE_URL}assets/${p}.jpg)` }}
             />
           ))}
         </div>

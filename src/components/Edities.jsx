@@ -12,7 +12,7 @@ const EDITIONS = [
     theme: "Editie XIII",
     attendees: "",
     tag: "Latest",
-    photo: `${import.meta.env.BASE_URL}/assets/photo-1.jpg`,
+    photo: `${import.meta.env.BASE_URL}assets/photo-1.jpg`,
     link: "",
   },
   {
@@ -20,7 +20,7 @@ const EDITIONS = [
     theme: "De Heropleving",
     attendees: "",
     tag: "",
-    photo: `${import.meta.env.BASE_URL}/assets/photo-3.jpg`,
+    photo: `${import.meta.env.BASE_URL}assets/photo-3.jpg`,
     link: "",
   },
   {
@@ -28,7 +28,7 @@ const EDITIONS = [
     theme: "De Gouden Jaren",
     attendees: "17 edities",
     tag: "Heritage",
-    photo: `${import.meta.env.BASE_URL}/assets/photo-6.jpg`,
+    photo: `${import.meta.env.BASE_URL}assets/photo-6.jpg`,
     archiveLink: "#/archief",
   },
 ];
