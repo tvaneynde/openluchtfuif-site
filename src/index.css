@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: "Rugrats";
-  src: url("./assets/fonts/Rugrats.otf") format("opentype");
+  src: url("/assets/fonts/Rugrats.otf") format("opentype");
   font-display: swap;
 }
 
@@ -313,6 +313,12 @@ section { position: relative; padding: 120px 40px; }
   color: var(--cream);
   opacity: 0.7;
   margin-top: 8px;
+}
+@media (max-width: 420px) {
+  .countdown { gap: 6px; }
+  .countdown-cell { padding: 10px 10px; min-width: 0; flex: 1; }
+  .countdown-num { font-size: 36px; }
+  .countdown-label { font-size: 9px; letter-spacing: 0.1em; }
 }
 
 .hero-cta {
