@@ -1057,6 +1057,7 @@ export default function Dashboard() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (!supabase) { setChecking(false); return; }
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setChecking(false);
@@ -1088,6 +1089,16 @@ export default function Dashboard() {
           color: 'rgba(244,231,208,0.35)',
           letterSpacing: '0.12em',
         }}>LADEN…</span>
+      </div>
+    );
+  }
+
+  if (!supabase) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#1e0b28', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '0.8rem', color: 'var(--orange-bright)', letterSpacing: '0.12em' }}>
+          Configuratiefout: Supabase niet beschikbaar.
+        </span>
       </div>
     );
   }
