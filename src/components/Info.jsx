@@ -5,7 +5,7 @@ export default function Info({ mode = 'coming_soon' }) {
   const [cards, setCards] = useState([]);
 
   useEffect(() => {
-    if (mode !== 'live') return;
+    if (mode !== 'live' || !supabase) return;
     supabase
       .from('info_cards')
       .select('*')

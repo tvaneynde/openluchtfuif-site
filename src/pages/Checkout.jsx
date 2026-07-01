@@ -365,7 +365,11 @@ export default function Checkout() {
       <div className="grain" style={s.grain} />
 
       <header style={s.header}>
-        <a href="/#tickets" style={s.backLink}>
+        <a
+          href="/#/"
+          style={s.backLink}
+          onClick={() => sessionStorage.setItem('scrollTo', 'tickets')}
+        >
           ← Terug
         </a>
         <span style={s.wordmark}>OLF 2026</span>

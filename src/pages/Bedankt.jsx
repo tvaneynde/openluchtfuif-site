@@ -259,7 +259,7 @@ export default function Bedankt() {
       <div className="grain" style={s.grain} />
 
       <header style={s.header}>
-        <a href="/#" style={s.backLink}>
+        <a href="/#/" style={s.backLink}>
           ← Home
         </a>
         <span style={s.wordmark}>OLF 2026</span>
@@ -310,7 +310,7 @@ export default function Bedankt() {
               >
                 ↓ Download tickets (PDF)
               </a>
-              <a href="/#" style={{ ...s.homeLink, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--cream)' }}>
+              <a href="/#/" style={{ ...s.homeLink, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', color: 'var(--cream)' }}>
                 Terug naar de site →
               </a>
             </div>
@@ -381,7 +381,7 @@ export default function Bedankt() {
               Geen bestelling gevonden
             </h1>
             <p style={s.sub}>De link klopt niet of de bestelling bestaat niet.</p>
-            <a href="/#" style={s.homeLink}>
+            <a href="/#/" style={s.homeLink}>
               Naar de startpagina
             </a>
           </>

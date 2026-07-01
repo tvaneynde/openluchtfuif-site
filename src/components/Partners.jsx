@@ -27,7 +27,7 @@ export default function Partners({ mode = 'live' }) {
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    if (mode !== 'live') { setLoading(false); return; }
+    if (mode !== 'live' || !supabase) { setLoading(false); return; }
     supabase
       .from('partners')
       .select('*')

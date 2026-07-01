@@ -68,6 +68,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const target = sessionStorage.getItem('scrollTo');
+    if (target) {
+      sessionStorage.removeItem('scrollTo');
+      const el = document.getElementById(target);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  useEffect(() => {
     const obs = new IntersectionObserver(
       (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("in"); }),
       { threshold: 0.1 }

@@ -6,7 +6,7 @@ export default function Faq({ mode = 'coming_soon' }) {
   const [open, setOpen] = useState(null);
 
   useEffect(() => {
-    if (mode !== 'live') return;
+    if (mode !== 'live' || !supabase) return;
     supabase
       .from('faq_items')
       .select('*')

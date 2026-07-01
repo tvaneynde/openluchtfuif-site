@@ -82,7 +82,7 @@ export default function Lineup({ mode = 'coming_soon' }) {
   const [artists, setArtists] = useState([]);
 
   useEffect(() => {
-    if (mode !== 'live') return;
+    if (mode !== 'live' || !supabase) return;
     supabase
       .from('lineup_artists')
       .select('*')
