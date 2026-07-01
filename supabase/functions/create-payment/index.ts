@@ -124,11 +124,13 @@ Deno.serve(async (req) => {
   //    Paid orders are NOT reused — buyer should be able to buy again freely.
   const iKey = await idempotencyKey(buyer_email, tier_id)
 
+  // Look up ANY order with this idempotency key, not just pending/awaiting_payment —
+  // mollie_idempotency_key is UNIQUE, so a cancelled/expired row with the same key
+  // must be reused (updated) rather than re-inserted, or the insert below fails.
   const { data: existingOrder } = await db
     .from('orders')
     .select('id, mollie_payment_id, status')
     .eq('mollie_idempotency_key', iKey)
-    .in('status', ['pending', 'awaiting_payment']) // ignore paid/expired
     .maybeSingle()
 
   if (existingOrder?.mollie_payment_id && existingOrder.status === 'awaiting_payment') {
@@ -142,12 +144,31 @@ Deno.serve(async (req) => {
     }
   }
 
-  // ── Create order ──────────────────────────────────────────────
+  // ── Create or reuse order row ───────────────────────────────────
   const totalCents = Math.max(0, (tier.price_cents + tier.fee_cents) * quantity - discountCents)
+  const reusable = existingOrder && ['pending', 'awaiting_payment', 'cancelled', 'expired'].includes(existingOrder.status)
 
   let orderId: string
-  if (existingOrder?.id) {
+  if (reusable) {
     orderId = existingOrder.id
+    const { error: uErr } = await db
+      .from('orders')
+      .update({
+        quantity,
+        total_cents: totalCents,
+        buyer_email: buyer_email.toLowerCase().trim(),
+        buyer_name:  buyer_name.trim(),
+        status: 'pending',
+        mollie_payment_id: null,
+        promo_code: validatedPromoCode,
+        discount_cents: discountCents,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+    if (uErr) {
+      console.error('Order update failed:', uErr)
+      return err('Failed to create order', 500)
+    }
   } else {
     const { data: order, error: oErr } = await db
       .from('orders')
