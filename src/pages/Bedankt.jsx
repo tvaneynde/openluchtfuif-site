@@ -29,11 +29,9 @@ export default function Bedankt() {
     async function poll() {
       pollCountRef.current += 1;
 
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, status, buyer_name, buyer_email, total_cents, quantity, mollie_payment_id, ticket_tiers(name)')
-        .eq('id', orderId)
-        .single();
+      const { data: rows, error } = await supabase
+        .rpc('get_order_status', { p_order_id: orderId });
+      const data = rows?.[0];
 
       if (error || !data) {
         setStatus('not_found');
@@ -252,7 +250,7 @@ export default function Bedankt() {
     },
   };
 
-  const tierName = order?.ticket_tiers?.name ?? '—';
+  const tierName = order?.tier_name ?? '—';
 
   return (
     <div style={s.page}>
@@ -331,7 +329,7 @@ export default function Bedankt() {
                 : 'De betaling werd geannuleerd.'}
             </p>
             <a
-              href={order ? `/#/checkout?tier_id=${order.ticket_tiers?.id ?? ''}` : '/#/checkout'}
+              href={order ? `/#/checkout?tier_id=${order.tier_id ?? ''}` : '/#/checkout'}
               style={s.retryLink}
             >
               Probeer opnieuw →
@@ -357,11 +355,9 @@ export default function Bedankt() {
                 setStatus('loading');
                 clearInterval(intervalRef.current);
                 intervalRef.current = setInterval(async () => {
-                  const { data } = await supabase
-                    .from('orders')
-                    .select('id, status, buyer_name, buyer_email, total_cents, quantity, mollie_payment_id, ticket_tiers(name)')
-                    .eq('id', orderId)
-                    .single();
+                  const { data: rows } = await supabase
+                    .rpc('get_order_status', { p_order_id: orderId });
+                  const data = rows?.[0];
                   if (!data) return;
                   setOrder(data);
                   if (data.status === 'paid') { setStatus('paid'); clearInterval(intervalRef.current); }
