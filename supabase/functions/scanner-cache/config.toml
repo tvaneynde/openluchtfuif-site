@@ -1,0 +1,2 @@
+[functions.scanner-cache]
+verify_jwt = false

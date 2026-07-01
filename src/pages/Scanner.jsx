@@ -13,6 +13,24 @@ import {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+// PIN check + offline ticket cache + gate stats, all authenticated server-side.
+// A correct X-Scanner-Key IS a successful login — never fetch the PIN or raw
+// scan_token values directly from the client.
+async function fetchScannerCache(pin) {
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scanner-cache`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'X-Scanner-Key': pin,
+      },
+    }
+  )
+  if (!res.ok) return null
+  return res.json()
+}
+
 function getOrCreateDeviceId() {
   let id = localStorage.getItem('scanner_device_id')
   if (!id) {
@@ -423,15 +441,9 @@ function PinGate({ onSuccess }) {
     setError('')
     const pin = digits.join('')
     try {
-      const { data, error: dbError } = await supabase
-        .from('config')
-        .select('value')
-        .eq('key', 'scanner_pin')
-        .single()
+      const result = await fetchScannerCache(pin)
 
-      if (dbError) throw dbError
-
-      if (data?.value === pin) {
+      if (result?.ok) {
         const session = saveSession(pin)
         onSuccess(session)
       } else {
@@ -544,25 +556,15 @@ function CameraView({ session, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
 
-  // Fetch gate stats
+  // Fetch gate stats (safe aggregate-only RPC — no secrets involved)
   const refreshStats = useCallback(async () => {
     try {
-      const todayStr = new Date().toISOString().slice(0, 10)
-      const [{ count: scanned }, { count: stillValid }] = await Promise.all([
-        supabase
-          .from('scan_events')
-          .select('id', { count: 'exact', head: true })
-          .eq('result', 'valid')
-          .gte('scanned_at', todayStr),
-        supabase
-          .from('tickets')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'valid'),
-      ])
-      const scannedN = scanned || 0
-      const validN = stillValid || 0
-      setScannedToday(scannedN)
-      setTotalIssued(scannedN + validN)
+      const { data } = await supabase.rpc('get_scan_stats')
+      const row = data?.[0]
+      if (row) {
+        setScannedToday(row.scanned_today || 0)
+        setTotalIssued(row.total_issued || 0)
+      }
     } catch {
       // ignore — stats are non-critical
     }
@@ -572,20 +574,9 @@ function CameraView({ session, onLogout }) {
   useEffect(() => {
     async function loadCache() {
       try {
-        const { data } = await supabase
-          .from('tickets')
-          .select('scan_token, ticket_number, status, orders(buyer_name), ticket_tiers(name)')
-          .eq('status', 'valid')
-        if (data) {
-          await cacheTokens(
-            data.map(t => ({
-              scan_token:    t.scan_token,
-              ticket_number: t.ticket_number,
-              status:        'valid',
-              buyer_name:    t.orders?.buyer_name ?? '',
-              tier_name:     t.ticket_tiers?.name ?? '',
-            }))
-          )
+        const result = await fetchScannerCache(session.pin)
+        if (result?.tickets) {
+          await cacheTokens(result.tickets)
         }
       } catch {
         // offline is fine — we still have IndexedDB
@@ -595,7 +586,7 @@ function CameraView({ session, onLogout }) {
     }
     loadCache()
     refreshStats()
-  }, [refreshStats])
+  }, [refreshStats, session])
 
   // Subscribe to scan_events INSERT for live scannedToday counter
   useEffect(() => {
