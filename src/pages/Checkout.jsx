@@ -424,7 +424,7 @@ export default function Checkout() {
             ) : (
               tiers.map((tier) => {
                 const active = selectedTier?.id === tier.id;
-                const remaining = tier.capacity - (tier.sold_count ?? 0);
+                const remaining = tier.total_capacity - (tier.sold_count ?? 0);
                 const low = remaining <= 20;
                 return (
                   <div
@@ -439,7 +439,7 @@ export default function Checkout() {
                     <div>
                       <div style={s.tierName}>{tier.name}</div>
                       <div style={s.tierFee}>+ {formatCents(tier.fee_cents)} transactiekosten</div>
-                      {tier.capacity != null && (
+                      {tier.total_capacity != null && (
                         <div style={s.capacityBadge(low)}>
                           {low ? `Nog ${remaining} beschikbaar` : `${remaining} beschikbaar`}
                         </div>
