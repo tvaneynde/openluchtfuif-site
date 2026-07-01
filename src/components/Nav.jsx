@@ -1,7 +1,9 @@
-function smoothScrollTo(id, e) {
+function smoothScrollTo(id, e, onNavigate) {
   e.preventDefault();
   const el = document.getElementById(id);
   if (!el) return;
+  // Set the active indicator immediately — before the scroll animation begins.
+  onNavigate?.(id);
   const target = el.getBoundingClientRect().top + window.scrollY - 72;
   const start = window.scrollY;
   const distance = target - start;
@@ -16,22 +18,39 @@ function smoothScrollTo(id, e) {
   requestAnimationFrame(step);
 }
 
-function MobileNav({ active }) {
-  const items = [
-    { id: 'home',    label: 'Home',     icon: '◉' },
-    { id: 'lineup',  label: 'Line-up',  icon: '♫' },
-    { id: 'tickets', label: 'Tickets',  icon: '⬡' },
-    { id: 'info',    label: 'Info',     icon: 'ℹ' },
-    { id: 'about',   label: 'Over ons', icon: '●' },
+// Page order matches document flow
+const ALL_ITEMS = [
+  { id: 'home',     label: 'Home',    always: true },
+  { id: 'lineup',   label: 'Line-Up', always: false },
+  { id: 'tickets',  label: 'Tickets', always: false },
+  { id: 'partners', label: 'Partners',always: false },
+  { id: 'info',     label: 'Info',    always: false },
+  { id: 'faq',      label: 'FAQ',     always: false },
+  { id: 'edities',  label: 'Edities', always: false },
+  { id: 'about',    label: 'Over ons',always: false },
+];
+
+function MobileNav({ active, sections, onNavigate }) {
+  const mobileItems = [
+    { id: 'home',    label: 'Home',     icon: '◉', always: true },
+    { id: 'lineup',  label: 'Line-up',  icon: '♫', always: false },
+    { id: 'tickets', label: 'Tickets',  icon: '⬡', always: false },
+    { id: 'info',    label: 'Info',     icon: 'ℹ', always: false },
+    { id: 'about',   label: 'Over ons', icon: '●', always: false },
   ];
+
+  const visible = mobileItems.filter(item =>
+    item.always || sections[item.id]?.visible !== false
+  );
+
   return (
     <nav className="mobile-nav">
-      {items.map(item => (
+      {visible.map(item => (
         <a
           key={item.id}
           href={`#${item.id}`}
           className={active === item.id ? 'active' : ''}
-          onClick={e => smoothScrollTo(item.id, e)}
+          onClick={e => smoothScrollTo(item.id, e, onNavigate)}
         >
           <span className="mobile-nav-icon">{item.icon}</span>
           <span className="mobile-nav-label">{item.label}</span>
@@ -41,26 +60,20 @@ function MobileNav({ active }) {
   );
 }
 
-export default function Nav({ active }) {
-  const items = [
-    ["home",     "Home"],
-    ["edities",  "Edities"],
-    ["lineup",   "Line-Up"],
-    ["tickets",  "Tickets"],
-    ["partners", "Partners"],
-    ["info",     "Info"],
-    ["faq",      "FAQ"],
-    ["about",    "Over ons"],
-  ];
+export default function Nav({ active, sections = {}, onNavigate }) {
+  const visible = ALL_ITEMS.filter(item =>
+    item.always || sections[item.id]?.visible !== false
+  );
+
   return (
     <>
       <nav className="nav">
-        {items.map(([id, label]) => (
+        {visible.map(({ id, label }) => (
           <a key={id} href={`#${id}`} className={active === id ? "active" : ""}
-            onClick={e => smoothScrollTo(id, e)}>{label}</a>
+            onClick={e => smoothScrollTo(id, e, onNavigate)}>{label}</a>
         ))}
       </nav>
-      <MobileNav active={active} />
+      <MobileNav active={active} sections={sections} onNavigate={onNavigate} />
     </>
   );
 }

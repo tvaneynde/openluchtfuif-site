@@ -6,6 +6,7 @@ import OrdersTable from './dashboard/OrdersTable.jsx';
 import EmailLog from './dashboard/EmailLog.jsx';
 import ScannerConfig from './dashboard/ScannerConfig.jsx';
 import PromoCodeManager from './dashboard/PromoCodeManager.jsx';
+import ContentManager from './dashboard/ContentManager.jsx';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -364,7 +365,7 @@ function Overview() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '40px 48px', color: 'var(--cream)', fontFamily: 'var(--body)' }}>
+    <div className="dash-overview">
       {/* Greeting */}
       <h1 style={{
         fontFamily: 'var(--display)',
@@ -388,12 +389,7 @@ function Overview() {
       </p>
 
       {/* ── 1. Key metrics row ── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 16,
-        marginBottom: 40,
-      }}>
+      <div className="dash-metrics-grid">
         <MetricCard
           label="Tickets verkocht"
           value={`${totalSold} / ${totalCapacity}`}
@@ -531,7 +527,7 @@ function Overview() {
       {/* ── 5. Live feeds row ── */}
       <div>
         <SectionLabel>Live feeds</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="dash-feeds-grid">
 
           {/* Left: Recent orders */}
           <div style={{ ...CARD_STYLE, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -847,6 +843,7 @@ const PAGE_TITLES = {
   '/dashboard/emails': 'E-mails',
   '/dashboard/scanner': 'Scanner',
   '/dashboard/promo': 'Promo codes',
+  '/dashboard/content': 'Content',
 };
 
 function getPageTitle(pathname) {
@@ -866,36 +863,26 @@ function TopBar({ session }) {
   const title = getPageTitle(location.pathname);
 
   return (
-    <div style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 10,
-      height: '56px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 48px',
-      background: 'rgba(36,10,48,0.95)',
-      backdropFilter: 'blur(8px)',
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
-      flexShrink: 0,
+    <div className="dash-topbar" style={{
+      position: 'sticky', top: 0, zIndex: 10, height: '56px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      background: 'rgba(36,10,48,0.95)', backdropFilter: 'blur(8px)',
+      borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0,
     }}>
-      <span style={{
-        fontFamily: 'var(--body)',
-        fontSize: '0.92rem',
-        fontWeight: 600,
-        color: 'var(--cream)',
-        letterSpacing: '0.01em',
-      }}>
-        {title}
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Wordmark shown only when sidebar is hidden (mobile) */}
+        <span className="dash-topbar-wordmark" style={{
+          fontFamily: 'var(--display)', fontSize: '1.3rem', color: 'var(--orange)',
+          letterSpacing: '0.04em', lineHeight: 1,
+        }}>OLF</span>
+        <span style={{ fontFamily: 'var(--body)', fontSize: '0.92rem', fontWeight: 600, color: 'var(--cream)', letterSpacing: '0.01em' }}>
+          {title}
+        </span>
+      </div>
       {session?.user?.email && (
-        <span style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '0.68rem',
-          letterSpacing: '0.1em',
-          color: 'rgba(244,231,208,0.4)',
-          textTransform: 'uppercase',
+        <span className="dash-topbar-email" style={{
+          fontFamily: 'var(--mono)', fontSize: '0.68rem',
+          letterSpacing: '0.1em', color: 'rgba(244,231,208,0.4)', textTransform: 'uppercase',
         }}>
           {session.user.email}
         </span>
@@ -954,6 +941,41 @@ function NavItem({ to, label, icon }) {
   );
 }
 
+// ─── Dashboard mobile bottom nav ─────────────────────────────────────────────
+
+function DashMobileNav() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const items = [
+    { to: '/dashboard',              label: 'Home',    icon: '◈' },
+    { to: '/dashboard/bestellingen', label: 'Orders',  icon: '≡' },
+    { to: '/dashboard/scanner',      label: 'Scanner', icon: '◎' },
+    { to: '/dashboard/content',      label: 'Content', icon: '✎' },
+    { to: '/dashboard/tickets',      label: 'Tickets', icon: '⬡' },
+  ];
+  return (
+    <nav className="dash-mobile-nav">
+      {items.map(item => {
+        const active = item.to === '/dashboard'
+          ? location.pathname === '/dashboard' || location.pathname === '/dashboard/'
+          : location.pathname.startsWith(item.to);
+        return (
+          <button key={item.to} onClick={() => navigate(item.to)} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 3, flex: 1,
+            color: active ? 'var(--orange)' : 'rgba(244,231,208,0.45)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '6px 4px', transition: 'color 0.2s',
+          }}>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ onSignOut }) {
@@ -1001,6 +1023,7 @@ function Sidebar({ onSignOut }) {
         <NavItem to="/dashboard/emails" label="E-mails" icon="✉" />
         <NavItem to="/dashboard/scanner" label="Scanner" icon="◎" />
         <NavItem to="/dashboard/promo" label="Promo codes" icon="%" />
+        <NavItem to="/dashboard/content" label="Content" icon="✎" />
       </nav>
 
       {/* Sign out + version */}
@@ -1097,14 +1120,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      background: '#1e0b28',
-      fontFamily: 'var(--body)',
-    }}>
-      <Sidebar onSignOut={handleSignOut} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#1e0b28', fontFamily: 'var(--body)' }}>
+      <div className="dash-sidebar">
+        <Sidebar onSignOut={handleSignOut} />
+      </div>
+      <div className="dash-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto' }}>
         <TopBar session={session} />
         <main style={{ flex: 1 }}>
           <Routes>
@@ -1114,8 +1134,10 @@ export default function Dashboard() {
             <Route path="emails" element={<EmailLog />} />
             <Route path="scanner" element={<ScannerConfig />} />
             <Route path="promo" element={<PromoCodeManager />} />
+            <Route path="content" element={<ContentManager />} />
           </Routes>
         </main>
+        <DashMobileNav />
       </div>
     </div>
   );

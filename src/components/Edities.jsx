@@ -36,6 +36,7 @@ const EDITIONS = [
 function EditionCard({ ed, size, style }) {
   const href = ed.link || ed.archiveLink || null;
   const Tag = href ? "a" : "div";
+  const isAnchor = Tag === "a";
   const linkProps = href
     ? { href, ...(ed.link ? { target: "_blank", rel: "noreferrer" } : {}) }
     : {};
@@ -59,7 +60,7 @@ function EditionCard({ ed, size, style }) {
           <span>{ed.theme}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             {ed.attendees && <span>{ed.attendees}</span>}
-            {ed.archiveLink !== undefined && (
+            {ed.archiveLink !== undefined && !isAnchor && (
               <a
                 href={ed.archiveLink || "#"}
                 style={{
@@ -75,6 +76,11 @@ function EditionCard({ ed, size, style }) {
               >
                 Alle foto's →
               </a>
+            )}
+            {ed.archiveLink !== undefined && isAnchor && (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.15em", color: "var(--cream)", opacity: 0.7 }}>
+                Alle foto's →
+              </span>
             )}
           </div>
         </div>
@@ -103,9 +109,9 @@ export default function Edities() {
       </div>
 
       {/* Second row: heritage card (wide) + CTA */}
-      <div className="edities-row2" style={{ gridTemplateColumns: "2fr 1fr" }}>
-        <EditionCard ed={EDITIONS[2]} size="third" style={{ aspectRatio: "unset", height: 480 }} />
-        <div className="edition-card third edition-cta-card" style={{ aspectRatio: "unset", height: 480 }}>
+      <div className="edities-row2">
+        <EditionCard ed={EDITIONS[2]} size="third" style={{ aspectRatio: "unset", height: 420 }} />
+        <div className="edition-card third edition-cta-card" style={{ aspectRatio: "unset", height: 420 }}>
           <div className="edition-cover" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
             <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px, 3vw, 48px)", lineHeight: 1.1, marginBottom: 20 }}>
               Jij erbij<br />in 2026?

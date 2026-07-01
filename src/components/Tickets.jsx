@@ -70,7 +70,7 @@ function TicketDoor() {
   );
 }
 
-export default function Tickets() {
+export default function Tickets({ mode = 'live' }) {
   return (
     <section id="tickets">
       <div className="section-head">
@@ -78,20 +78,33 @@ export default function Tickets() {
         <h2 className="section-title">Tickets</h2>
       </div>
 
-      <p style={{ fontSize: 18, maxWidth: 640, marginBottom: 56, opacity: 0.85 }}>
-        Hoe vroeger, hoe goedkoper.
-      </p>
-
-      <div className="tickets-grid">
-        <TicketEarlyBird />
-        <TicketWaves />
-        <TicketDoor />
-      </div>
-
-      <div className="tkt-notice">
-        <span>-18? Kom met ID.</span>
-        <span>Alcohol &lt;16 = nee</span>
-      </div>
+      {mode === 'coming_soon' ? (
+        <div style={{ paddingBottom: 40 }}>
+          <div className="mono" style={{ color: "var(--orange-bright)", marginBottom: 16 }}>◉ Binnenkort</div>
+          <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px, 5vw, 64px)", lineHeight: 0.95, marginBottom: 20 }}>
+            Tickets komen<br />snel online
+          </div>
+          <p style={{ fontSize: 15, opacity: 0.6, maxWidth: 440, marginBottom: 28 }}>
+            Schrijf je in op onze mailinglijst en wees de eerste die weet wanneer de tickets in de verkoop gaan.
+          </p>
+          <a className="btn btn-primary" href="https://www.instagram.com/openluchtfuif3212" target="_blank" rel="noreferrer">Volg ons →</a>
+        </div>
+      ) : (
+        <>
+          <p style={{ fontSize: 18, maxWidth: 640, marginBottom: 56, opacity: 0.85 }}>
+            Hoe vroeger, hoe goedkoper.
+          </p>
+          <div className="tickets-grid">
+            <TicketEarlyBird />
+            <TicketWaves />
+            <TicketDoor />
+          </div>
+          <div className="tkt-notice">
+            <span>-18? Kom met ID.</span>
+            <span>Alcohol &lt;16 = nee</span>
+          </div>
+        </>
+      )}
     </section>
   );
 }

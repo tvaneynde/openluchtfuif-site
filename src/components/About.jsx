@@ -22,7 +22,7 @@ export default function About() {
               { n: "1993", l: "Eerste editie" },
               { n: "17", l: "Jaar pauze" },
               { n: "40+", l: "Vrijwilligers" },
-              { n: "8", l: "Kernleden" },
+              { n: "XIV", l: "Editie in 2026" },
             ].map((s, i) => (
               <div
                 key={i}

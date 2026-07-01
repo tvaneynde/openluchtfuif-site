@@ -1,46 +1,11 @@
-import { imgUrl } from '../utils/supabase';
+import { useState, useEffect } from 'react';
+import { supabase, imgUrl } from '../utils/supabase';
 
-const COMING_SOON = false;
-
-const HOOFDSPONSORS = [
-  { name: "Baets",    file: "baets.jpg" },
-  { name: "Huurland", file: "huurland.png" },
-  { name: "Pasteels", file: "pasteels.png" },
-];
-
-const PARTNERS = [
-  { name: "Spar Linden",    file: "sparlinden.jpg" },
-  { name: "Vlaams-Brabant", file: "vlaamsbrabant.jpg.jpg" },
-  { name: "Immodrome",      file: "immodrome.png" },
-  { name: "Philippe Spaas", file: "philippespaas.png" },
-  { name: "Bits & Baets",   file: "bitsnbaets.png" },
-  { name: "Lopharma",       file: "lopharma.png" },
-  { name: "De Raaf",        file: "deraaf.png" },
-  { name: "Sempels",        file: "sempels.svg" },
-  { name: "RGT Cars",       file: "rgtcars.png" },
-  { name: "Shaved Monkey",  file: "shavedmonkey.png" },
-  { name: "An Wouters",     file: "anwouters.png" },
-  { name: "Louis Schreve",  file: "louisschrevebs.png" },
-  { name: "Buurt 3212",     file: "buurt3212.jpeg" },
-  { name: "Uw Notaris",     file: "uwnotaris.jpg" },
-];
-
-const SCATTER_MAIN = [
-  { r: -2   }, { r:  1.5 }, { r: -1   }, { r:  2   },
-  { r: -1.5 }, { r:  2   }, { r: -2.5 }, { r:  1   },
-  { r: -1.5 }, { r:  2   }, { r: -1   }, { r:  1.5 },
-  { r: -2   }, { r:  1   },
-];
-
-const SCATTER_HOOFDSPONSORS = [
-  { r: -1.5 }, { r: 0 }, { r: 1.5 },
-];
-
-function PartnerLogo({ file, name, size = 72 }) {
+function PartnerLogo({ path, name, size = 72 }) {
   return (
     <div className="scatter-logo-wrap" style={{ width: size, height: size }}>
       <img
-        src={imgUrl(`partners/${file}`)}
+        src={imgUrl(path)}
         alt={name}
         className="scatter-logo-img"
         onError={e => { e.currentTarget.style.opacity = "0"; }}
@@ -49,14 +14,42 @@ function PartnerLogo({ file, name, size = 72 }) {
   );
 }
 
-export default function Partners() {
+const SCATTER_FEATURED = [{ r: -1.5 }, { r: 0 }, { r: 1.5 }, { r: -1 }, { r: 1 }];
+const SCATTER_MAIN = [
+  { r: -2 }, { r: 1.5 }, { r: -1 }, { r: 2 }, { r: -1.5 }, { r: 2 },
+  { r: -2.5 }, { r: 1 }, { r: -1.5 }, { r: 2 }, { r: -1 }, { r: 1.5 },
+  { r: -2 }, { r: 1 }, { r: -0.5 }, { r: 2 },
+];
+
+export default function Partners({ mode = 'live' }) {
+  const [featured, setFeatured] = useState([]);
+  const [regular, setRegular]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    if (mode !== 'live') { setLoading(false); return; }
+    supabase
+      .from('partners')
+      .select('*')
+      .eq('active', true)
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) {
+          setFeatured(data.filter(p => p.featured));
+          setRegular(data.filter(p => !p.featured));
+        }
+        setLoading(false);
+      });
+  }, [mode]);
+
   return (
     <section id="partners">
       <div className="section-head">
         <span className="section-num">05 / Steun</span>
         <h2 className="section-title">Partners</h2>
       </div>
-      {COMING_SOON ? (
+
+      {mode === 'coming_soon' ? (
         <div style={{ paddingBottom: 40 }}>
           <div className="mono" style={{ color: "var(--orange-bright)", marginBottom: 16 }}>◉ Binnenkort</div>
           <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px, 5vw, 64px)", lineHeight: 0.95, marginBottom: 20 }}>
@@ -67,54 +60,68 @@ export default function Partners() {
           </p>
           <a className="btn btn-primary" href="mailto:openluchtfuif3212@gmail.com">Word partner →</a>
         </div>
+      ) : loading ? (
+        <div style={{ padding: '60px 0', fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.3 }}>LADEN…</div>
       ) : (
         <>
           <p style={{ fontSize: 18, maxWidth: 720, marginBottom: 48, opacity: 0.85 }}>
             Zonder deze mensen staat er letterlijk geen podium. Dikke merci.
           </p>
 
-          {/* Hoofdsponsors */}
-          <div className="mono" style={{ color: "var(--orange-bright)", letterSpacing: "0.2em", marginBottom: 20 }}>
-            ◉ Hoofdsponsors
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, marginBottom: 48 }}>
-            {HOOFDSPONSORS.map((p, i) => (
-              <div
-                key={p.name}
-                className="partner-scatter-tile scroll-reveal"
-                style={{
-                  "--r":     `${SCATTER_HOOFDSPONSORS[i].r}deg`,
-                  "--delay": `${i * 0.08}s`,
-                  padding: "36px 28px 30px",
-                }}
-              >
-                <PartnerLogo file={p.file} name={p.name} size={110} />
-                <span className="scatter-name" style={{ fontSize: "clamp(18px, 1.8vw, 24px)" }}>
-                  {p.name}
-                </span>
+          {featured.length > 0 && (
+            <>
+              <div className="mono" style={{ color: "var(--orange-bright)", letterSpacing: "0.2em", marginBottom: 20 }}>
+                ◉ Hoofdsponsors
               </div>
-            ))}
-          </div>
+              <div className="partners-featured-grid">
+                {featured.map((p, i) => (
+                  <div
+                    key={p.id}
+                    className="partner-scatter-tile"
+                    style={{
+                      "--r":     `${(SCATTER_FEATURED[i] || SCATTER_FEATURED[0]).r}deg`,
+                      "--delay": `${i * 0.08}s`,
+                      padding: "36px 28px 30px",
+                    }}
+                  >
+                    {p.logo_path
+                      ? <PartnerLogo path={p.logo_path} name={p.name} size={110} />
+                      : <div style={{ width: 110, height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, opacity: 0.3 }}>{p.name}</div>
+                    }
+                    <span className="scatter-name" style={{ fontSize: "clamp(18px, 1.8vw, 24px)" }}>
+                      {p.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
-          {/* Regular partners */}
-          <div className="mono" style={{ color: "rgba(244,231,208,.4)", letterSpacing: "0.2em", marginBottom: 20 }}>
-            ◉ Partners
-          </div>
-          <div className="partners-scatter">
-            {PARTNERS.map((p, i) => (
-              <div
-                key={p.name}
-                className="partner-scatter-tile scroll-reveal"
-                style={{
-                  "--r":     `${SCATTER_MAIN[i].r}deg`,
-                  "--delay": `${i * 0.06}s`,
-                }}
-              >
-                <PartnerLogo file={p.file} name={p.name} />
-                <span className="scatter-name">{p.name}</span>
+          {regular.length > 0 && (
+            <>
+              <div className="mono" style={{ color: "rgba(244,231,208,.4)", letterSpacing: "0.2em", marginBottom: 20 }}>
+                ◉ Partners
               </div>
-            ))}
-          </div>
+              <div className="partners-scatter">
+                {regular.map((p, i) => (
+                  <div
+                    key={p.id}
+                    className="partner-scatter-tile"
+                    style={{
+                      "--r":     `${(SCATTER_MAIN[i] || { r: 0 }).r}deg`,
+                      "--delay": `${i * 0.06}s`,
+                    }}
+                  >
+                    {p.logo_path
+                      ? <PartnerLogo path={p.logo_path} name={p.name} />
+                      : <div style={{ width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, opacity: 0.3 }}>{p.name}</div>
+                    }
+                    <span className="scatter-name">{p.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="partners-cta">
             <div style={{ fontFamily: "var(--display)", fontSize: "clamp(28px, 4vw, 52px)", marginBottom: 12 }}>

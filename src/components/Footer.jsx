@@ -6,7 +6,7 @@ export default function Footer() {
           style={{ fontFamily: "var(--display)", fill: "var(--purple-soft)", opacity: 0.45, userSelect: "none" }}
         >OPENLUCHTFUIF</text>
       </svg>
-      <div className="footer-grid" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+      <div className="footer-grid">
         <div className="footer-col">
           <h4>◉ Navigatie</h4>
           <a href="#home">Home</a>
