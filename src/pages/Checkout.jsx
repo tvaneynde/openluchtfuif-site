@@ -23,6 +23,7 @@ export default function Checkout() {
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
     const preselectedId = params.get('tier_id');
 
+    if (!supabase) { setLoading(false); return; }
     supabase
       .from('ticket_tiers')
       .select('*')
@@ -47,7 +48,7 @@ export default function Checkout() {
     : 0;
 
   async function validatePromo() {
-    if (!promoCode || !selectedTier) return;
+    if (!promoCode || !selectedTier || !supabase) return;
     setPromoValidating(true);
     setPromoResult(null);
     const code = promoCode.trim().toUpperCase();

@@ -57,6 +57,7 @@ export default function App() {
   const [sections, setSections] = useState({});
 
   useEffect(() => {
+    if (!supabase) return;
     supabase.from('page_sections').select('*').then(({ data }) => {
       if (data) {
         const map = {};
@@ -94,7 +95,7 @@ export default function App() {
             <div
               key={i}
               className="ph"
-              style={{ backgroundImage: `url(${import.meta.env.BASE_URL}/assets/${p}.jpg)` }}
+              style={{ backgroundImage: `url(${import.meta.env.BASE_URL}assets/${p}.jpg)` }}
             />
           ))}
         </div>
