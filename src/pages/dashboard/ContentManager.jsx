@@ -3,7 +3,7 @@ import { supabase, imgUrl } from '../../utils/supabase';
 import { useIsMobile } from '../../utils/useIsMobile';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const MONO = { fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.18em', textTransform: 'uppercase' };
+const MONO = { fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase' };
 const CARD = { background: 'rgba(42,15,51,0.7)', border: '1px solid rgba(244,231,208,0.1)', borderRadius: 14 };
 const INPUT_STYLE = {
   background: 'rgba(244,231,208,0.06)', border: '1px solid rgba(244,231,208,0.12)',
@@ -56,8 +56,8 @@ function ModeSegment({ value, onChange }) {
     <div style={{ display: 'flex', background: 'rgba(244,231,208,0.05)', borderRadius: 8, padding: 3, gap: 2 }}>
       {['live', 'coming_soon'].map(m => (
         <button key={m} onClick={() => onChange(m)} style={{
-          padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-          ...MONO, fontSize: 9,
+          padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+          ...MONO, fontSize: 11,
           background: value === m ? 'rgba(255,120,50,0.18)' : 'transparent',
           color: value === m ? 'var(--orange)' : 'rgba(244,231,208,0.35)',
           transition: 'all 0.15s',
@@ -97,25 +97,25 @@ function SectionsTab() {
   const sorted = [...sections].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {sorted.map(sec => {
         const hasMode = HAS_MODE.has(sec.id);
         return (
           <div key={sec.id} style={{
-            ...CARD, padding: '16px 20px',
-            display: 'flex', flexDirection: 'column', gap: 12,
+            ...CARD, padding: '20px 24px',
+            display: 'flex', flexDirection: 'column', gap: 14,
             opacity: saving[sec.id] ? 0.5 : 1, transition: 'opacity 0.2s',
           }}>
             {/* Row 1: name + badge + switch */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                <span style={{ fontFamily: 'var(--display)', fontSize: 20 }}>{sec.label}</span>
+                <span style={{ fontFamily: 'var(--display)', fontSize: 22 }}>{sec.label}</span>
                 <StatusBadge visible={sec.visible} mode={sec.mode} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <Switch value={sec.visible} onChange={v => update(sec.id, { visible: v })} />
                 {!isMobile && (
-                  <span style={{ ...MONO, color: sec.visible ? 'rgba(244,231,208,0.5)' : 'rgba(244,231,208,0.2)', fontSize: 9 }}>
+                  <span style={{ ...MONO, color: sec.visible ? 'rgba(244,231,208,0.5)' : 'rgba(244,231,208,0.2)', fontSize: 11 }}>
                     {sec.visible ? 'Zichtbaar' : 'Verborgen'}
                   </span>
                 )}
@@ -125,7 +125,7 @@ function SectionsTab() {
             {/* Row 2: mode control (only for sections that support it) */}
             {hasMode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 9, minWidth: 40 }}>Modus</span>
+                <span style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 11, minWidth: 40 }}>Modus</span>
                 <ModeSegment value={sec.mode} onChange={m => update(sec.id, { mode: m })} />
               </div>
             )}
@@ -139,7 +139,104 @@ function SectionsTab() {
   );
 }
 
+// ── Image upload field (uploads directly to Supabase Storage) ─────────────────
+function ImageUploadField({ folder, value, onChange, contain = true, previewHeight = 48 }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${folder}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(path, file, { cacheControl: '3600', contentType: file.type || undefined });
+    setUploading(false);
+    if (uploadError) { setError('Upload mislukt'); return; }
+    onChange(path);
+  }
+
+  const btnStyle = {
+    padding: '7px 14px', borderRadius: 6, border: '1px solid rgba(244,231,208,0.15)',
+    background: 'transparent', color: 'rgba(244,231,208,0.6)', cursor: uploading ? 'default' : 'pointer',
+    fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.08em', whiteSpace: 'nowrap',
+    transition: 'all 0.15s', flexShrink: 0,
+  };
+
+  return (
+    <div>
+      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
+      {value ? (
+        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img
+            src={imgUrl(value)}
+            alt=""
+            style={{
+              height: previewHeight, maxWidth: 80, objectFit: contain ? 'contain' : 'cover',
+              background: contain ? '#fff' : 'transparent', borderRadius: 6,
+              padding: contain ? 6 : 0, flexShrink: 0,
+            }}
+            onError={e => e.currentTarget.style.display = 'none'}
+          />
+          <div style={{ ...MONO, flex: 1, minWidth: 0, color: 'rgba(244,231,208,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {value.split('/').pop()}
+          </div>
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} style={btnStyle}>
+            {uploading ? 'Bezig…' : 'Vervang'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            style={{ ...btnStyle, color: 'rgba(255,120,100,0.6)', borderColor: 'rgba(255,120,100,0.2)' }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          style={{
+            width: '100%', padding: '14px', borderRadius: 8,
+            border: '1px dashed rgba(244,231,208,0.2)', background: 'transparent',
+            color: 'rgba(244,231,208,0.4)', cursor: uploading ? 'default' : 'pointer',
+            fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.1em',
+            transition: 'all 0.15s',
+          }}
+        >
+          {uploading ? 'Uploaden…' : '⬆ Upload afbeelding'}
+        </button>
+      )}
+      {error && <div style={{ ...MONO, color: '#ff7070', marginTop: 6, fontSize: 10 }}>{error}</div>}
+    </div>
+  );
+}
+
 // ── Artist form panel ──────────────────────────────────────────────────────────
+function StageSegment({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', background: 'rgba(244,231,208,0.05)', borderRadius: 8, padding: 3, gap: 2 }}>
+      {[['main', 'Main Stage'], ['dub', 'Dub Stage']].map(([v, label]) => (
+        <button key={v} onClick={() => onChange(v)} style={{
+          padding: '7px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+          ...MONO, fontSize: 11,
+          background: value === v ? 'rgba(255,120,50,0.18)' : 'transparent',
+          color: value === v ? 'var(--orange)' : 'rgba(244,231,208,0.35)',
+          transition: 'all 0.15s',
+        }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ArtistPanel({ form, setForm, onSave, onClose, busy, isNew }) {
   return (
     <div style={{ padding: '24px 22px', display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -148,15 +245,32 @@ function ArtistPanel({ form, setForm, onSave, onClose, busy, isNew }) {
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(244,231,208,0.4)', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, overflowY: 'auto' }}>
         <Field label="Naam">
           <input style={INPUT_STYLE} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
         </Field>
-        <Field label="Genre">
-          <input style={INPUT_STYLE} value={form.genre} onChange={e => setForm(f => ({ ...f, genre: e.target.value }))} />
+        <Field label="Podium">
+          <StageSegment value={form.stage || 'main'} onChange={v => setForm(f => ({ ...f, stage: v }))} />
         </Field>
         <Field label="Tijdslot">
           <input style={INPUT_STYLE} value={form.time_slot || ''} placeholder="20:00 – 21:00" onChange={e => setForm(f => ({ ...f, time_slot: e.target.value }))} />
+        </Field>
+        <Field label="Foto">
+          <ImageUploadField
+            folder="artists"
+            value={form.photo_path}
+            onChange={path => setForm(f => ({ ...f, photo_path: path }))}
+            contain={false}
+            previewHeight={44}
+          />
+        </Field>
+        <Field label="Bio (voor de artiest-popup)">
+          <textarea
+            style={{ ...INPUT_STYLE, minHeight: 90, resize: 'vertical', fontFamily: 'var(--body)' }}
+            value={form.bio || ''}
+            placeholder="Korte omschrijving van de artiest…"
+            onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+          />
         </Field>
         <div style={{ display: 'flex', gap: 24, marginTop: 4 }}>
           <ToggleRow label="Headliner" value={form.headliner} onChange={v => setForm(f => ({ ...f, headliner: v }))} />
@@ -222,7 +336,8 @@ function PanelWrap({ open, children, isMobile }) {
 }
 
 // ── Lineup tab ─────────────────────────────────────────────────────────────────
-const EMPTY_ARTIST = { name: '', genre: 'DJ Set', time_slot: '', headliner: false, active: true };
+const EMPTY_ARTIST = { name: '', genre: 'DJ Set', time_slot: '', stage: 'main', photo_path: '', bio: '', headliner: false, active: true };
+const STAGE_LABEL = { main: 'Main Stage', dub: 'Dub Stage' };
 
 function LineupTab() {
   const [artists, setArtists] = useState([]);
@@ -231,6 +346,7 @@ function LineupTab() {
   const [busy, setBusy] = useState(false);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
+  const [stageFilter, setStageFilter] = useState('all');
 
   useEffect(() => { load(); }, []);
 
@@ -242,7 +358,7 @@ function LineupTab() {
   function startEdit(a) { setEditing(a.id); setForm({ ...a }); }
   function startNew() {
     setEditing('new');
-    setForm({ ...EMPTY_ARTIST, sort_order: artists.length + 1 });
+    setForm({ ...EMPTY_ARTIST, stage: stageFilter === 'all' ? 'main' : stageFilter, sort_order: artists.length + 1 });
   }
   function closePanel() { setEditing(null); }
 
@@ -273,15 +389,25 @@ function LineupTab() {
     setArtists(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
   }
 
-  // Drag & drop reorder
-  function handleDragStart(i) { setDragIdx(i); }
-  function handleDragOver(e, i) { e.preventDefault(); setOverIdx(i); }
-  function handleDrop(dropI) {
-    if (dragIdx === null || dragIdx === dropI) return;
-    const next = [...artists];
-    const [moved] = next.splice(dragIdx, 1);
-    next.splice(dropI, 0, moved);
-    const withOrder = next.map((a, i) => ({ ...a, sort_order: i + 1 }));
+  // Drag & drop reorder — keyed by id (not index) so it stays correct while
+  // a stage filter is applied; reordering only happens within the visible
+  // subset, then merged back into the full list to compute global sort_order.
+  const visible = stageFilter === 'all' ? artists : artists.filter(a => a.stage === stageFilter);
+
+  function handleDragStart(id) { setDragIdx(id); }
+  function handleDragOver(e, id) { e.preventDefault(); setOverIdx(id); }
+  function handleDrop(dropId) {
+    if (dragIdx === null || dragIdx === dropId) return;
+    const visibleIds = visible.map(a => a.id);
+    const dragPos = visibleIds.indexOf(dragIdx);
+    const dropPos = visibleIds.indexOf(dropId);
+    if (dragPos === -1 || dropPos === -1) return;
+    const reordered = [...visible];
+    const [moved] = reordered.splice(dragPos, 1);
+    reordered.splice(dropPos, 0, moved);
+    let vi = 0;
+    const merged = artists.map(a => (stageFilter === 'all' || a.stage === stageFilter) ? reordered[vi++] : a);
+    const withOrder = merged.map((a, i) => ({ ...a, sort_order: i + 1 }));
     setArtists(withOrder);
     setDragIdx(null); setOverIdx(null);
     // Persist new order
@@ -295,36 +421,48 @@ function LineupTab() {
     <div style={{ display: 'flex', gap: 0, minHeight: 400 }}>
       {/* List */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <span style={{ ...MONO, color: 'rgba(244,231,208,0.3)' }}>{artists.length} artiesten</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['all', 'Alle'], ['main', 'Main Stage'], ['dub', 'Dub Stage']].map(([v, label]) => (
+              <button key={v} onClick={() => setStageFilter(v)} style={{
+                padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+                ...MONO, fontSize: 11,
+                border: `1px solid ${stageFilter === v ? 'var(--orange)' : 'rgba(244,231,208,0.15)'}`,
+                background: stageFilter === v ? 'rgba(255,120,50,0.12)' : 'transparent',
+                color: stageFilter === v ? 'var(--orange)' : 'rgba(244,231,208,0.4)',
+              }}>
+                {label}
+              </button>
+            ))}
+          </div>
           <button onClick={startNew} style={addBtnStyle}>+ Toevoegen</button>
         </div>
 
         <div style={{ ...CARD, overflow: 'hidden' }}>
-          {artists.length === 0 && (
+          {visible.length === 0 && (
             <div style={{ padding: '48px 24px', textAlign: 'center', ...MONO, color: 'rgba(244,231,208,0.2)' }}>
               Nog geen artiesten — voeg er een toe
             </div>
           )}
-          {artists.map((a, i) => (
+          {visible.map((a, i) => (
             <div
               key={a.id}
               draggable
-              onDragStart={() => handleDragStart(i)}
-              onDragOver={e => handleDragOver(e, i)}
-              onDrop={() => handleDrop(i)}
+              onDragStart={() => handleDragStart(a.id)}
+              onDragOver={e => handleDragOver(e, a.id)}
+              onDrop={() => handleDrop(a.id)}
               onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
               onClick={() => startEdit(a)}
               style={{
                 display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr auto auto' : '28px 1fr auto auto auto',
+                gridTemplateColumns: isMobile ? '1fr auto auto' : '28px 1fr auto auto auto auto',
                 alignItems: 'center', gap: isMobile ? 10 : 14,
                 padding: '12px 16px',
-                borderBottom: i < artists.length - 1 ? '1px solid rgba(244,231,208,0.05)' : 'none',
+                borderBottom: i < visible.length - 1 ? '1px solid rgba(244,231,208,0.05)' : 'none',
                 background: editing === a.id ? 'rgba(255,120,50,0.06)' :
-                            overIdx === i ? 'rgba(244,231,208,0.04)' : 'transparent',
-                borderLeft: overIdx === i && dragIdx !== i ? '2px solid rgba(255,120,50,0.5)' : '2px solid transparent',
-                cursor: 'pointer', opacity: a.active ? (dragIdx === i ? 0.35 : 1) : 0.4,
+                            overIdx === a.id ? 'rgba(244,231,208,0.04)' : 'transparent',
+                borderLeft: overIdx === a.id && dragIdx !== a.id ? '2px solid rgba(255,120,50,0.5)' : '2px solid transparent',
+                cursor: 'pointer', opacity: a.active ? (dragIdx === a.id ? 0.35 : 1) : 0.4,
                 transition: 'background 0.12s, opacity 0.2s',
               }}
             >
@@ -335,6 +473,11 @@ function LineupTab() {
                   <span style={{ ...MONO, background: 'rgba(255,120,50,0.12)', color: 'var(--orange)', padding: '2px 8px', borderRadius: 999, flexShrink: 0 }}>HL</span>
                 )}
               </div>
+              {!isMobile && (
+                <span style={{ ...MONO, color: a.stage === 'dub' ? 'rgba(190,150,255,0.7)' : 'rgba(244,231,208,0.35)', flexShrink: 0 }}>
+                  {STAGE_LABEL[a.stage] || STAGE_LABEL.main}
+                </span>
+              )}
               <div onClick={e => e.stopPropagation()}>
                 <Switch value={a.active} onChange={() => toggleActive(a)} />
               </div>
@@ -370,15 +513,15 @@ function PartnerPanel({ form, setForm, onSave, onClose, busy, isNew }) {
         <Field label="Naam">
           <input style={INPUT_STYLE} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
         </Field>
-        <Field label="Logo pad (storage)">
-          <input style={INPUT_STYLE} value={form.logo_path || ''} placeholder="partners/naam.png" onChange={e => setForm(f => ({ ...f, logo_path: e.target.value }))} />
+        <Field label="Logo">
+          <ImageUploadField
+            folder="partners"
+            value={form.logo_path}
+            onChange={path => setForm(f => ({ ...f, logo_path: path }))}
+            contain={true}
+            previewHeight={44}
+          />
         </Field>
-        {form.logo_path && (
-          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src={imgUrl(form.logo_path)} alt="" style={{ height: 44, objectFit: 'contain', background: '#fff', borderRadius: 6, padding: 6 }} onError={e => e.currentTarget.style.display = 'none'} />
-            <span style={{ ...MONO, color: 'rgba(244,231,208,0.3)' }}>Preview</span>
-          </div>
-        )}
         <Field label="Website URL">
           <input style={INPUT_STYLE} value={form.website_url || ''} placeholder="https://…" onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))} />
         </Field>
@@ -676,7 +819,7 @@ function FaqTab() {
             >
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--body)', fontWeight: 600, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.question}</div>
-                <div style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.answer}</div>
+                <div style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.answer}</div>
               </div>
               <div onClick={e => e.stopPropagation()}>
                 <Switch value={item.active} onChange={() => toggleActive(item)} />
@@ -820,10 +963,10 @@ function InfoTab() {
               }}
             >
               {!isMobile && <span style={{ color: 'rgba(244,231,208,0.2)', fontSize: 14, userSelect: 'none' }}>⠿</span>}
-              {!isMobile && <span style={{ ...MONO, color: 'var(--orange)', fontSize: 9, whiteSpace: 'nowrap' }}>{c.label}</span>}
+              {!isMobile && <span style={{ ...MONO, color: 'var(--orange)', fontSize: 11, whiteSpace: 'nowrap' }}>{c.label}</span>}
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--body)', fontWeight: 600, marginBottom: 2 }}>{c.title}</div>
-                <div style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isMobile ? c.label : c.body}</div>
+                <div style={{ ...MONO, color: 'rgba(244,231,208,0.3)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{isMobile ? c.label : c.body}</div>
               </div>
               <div onClick={e => e.stopPropagation()}>
                 <Switch value={c.active} onChange={() => toggleActive(c)} />
@@ -844,7 +987,7 @@ function InfoTab() {
 const addBtnStyle = {
   background: 'rgba(255,120,50,0.12)', border: '1px solid rgba(255,120,50,0.3)',
   borderRadius: 8, padding: '7px 16px', cursor: 'pointer', color: 'var(--orange)',
-  fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.12em',
+  fontFamily: 'var(--mono)', fontSize: 12, letterSpacing: '0.1em',
   transition: 'all 0.15s',
 };
 
@@ -874,8 +1017,8 @@ export default function ContentManager() {
             borderLeft: tab === t.id ? '2px solid var(--orange)' : '2px solid transparent',
             transition: 'all 0.15s',
           }}>
-            <span style={{ fontSize: 13, opacity: 0.7 }}>{t.icon}</span>
-            <span style={{ ...MONO, fontSize: 10 }}>{t.label}</span>
+            <span style={{ fontSize: 14, opacity: 0.7 }}>{t.icon}</span>
+            <span style={{ ...MONO, fontSize: 12 }}>{t.label}</span>
           </button>
         ))}
       </nav>

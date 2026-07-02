@@ -25,6 +25,14 @@ import Checkout from './pages/Checkout.jsx'
 import Bedankt from './pages/Bedankt.jsx'
 import Scanner from './pages/Scanner.jsx'
 
+// Disable the browser's native scroll restoration — it restores a raw pixel
+// offset that drifts as async content (images, ticket data) changes page
+// height, landing users in the wrong section. We restore by element id instead
+// (see the sessionStorage 'scrollTo' handling in App.jsx).
+if ('scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual'
+}
+
 // Mollie redirect shim: converts ?order_id=xxx (real query param Mollie uses)
 // into #/bedankt?order_id=xxx (hash router route) before React boots.
 const _sp = new URLSearchParams(window.location.search)
@@ -42,6 +50,7 @@ createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/archief" element={<Archive />} />
+        <Route path="/archief/:year" element={<Archive />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/bedankt" element={<Bedankt />} />

@@ -64,7 +64,7 @@ export default function Hero() {
           <div
             style={{
               fontFamily: "var(--display)",
-              fontSize: 20,
+              fontSize: 22,
               marginTop: 2,
               lineHeight: 1.2,
             }}

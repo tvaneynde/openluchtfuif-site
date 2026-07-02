@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "openluchtfuif",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/Users/tomasvaneynde/.nvm/versions/node/v24.9.0/bin/node",
+      "runtimeArgs": ["--require", "./node-polyfill.cjs", "./node_modules/.bin/vite"],
       "port": 5173,
       "autoPort": true
     }

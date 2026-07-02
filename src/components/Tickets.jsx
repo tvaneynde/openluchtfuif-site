@@ -78,7 +78,13 @@ function TicketStub({ tier, index }) {
             {status === 'soldout' ? 'Vol' : status === 'soon' ? '...' : 'Dicht'}
           </span>
         ) : (
-          <a href={`/#/checkout?tier_id=${tier.id}`} className="ticket-cta">Koop →</a>
+          <a
+            href={`/#/checkout?tier_id=${tier.id}`}
+            className="ticket-cta"
+            onClick={() => sessionStorage.setItem('scrollTo', 'tickets')}
+          >
+            Koop →
+          </a>
         )}
       </div>
     </div>
@@ -144,7 +150,7 @@ export default function Tickets({ mode = 'live' }) {
   }, [mode]);
 
   return (
-    <section id="tickets">
+    <section id="tickets" className="section-glow glow-tickets">
       <div className="section-head">
         <span className="section-num">04 / Toegang</span>
         <h2 className="section-title">Tickets</h2>

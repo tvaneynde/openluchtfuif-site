@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { supabase, imgUrl } from '../utils/supabase';
+
+const BATCH_SIZE = 40;
 
 function shuffle(arr) {
   const a = [...arr];
@@ -108,34 +110,76 @@ function Lightbox({ photos, index, onClose, onPrev, onNext }) {
 }
 
 export default function Archive() {
+  const { year } = useParams();
+  const folder = year ? `editions/${year}` : 'archive';
+
   const [photos, setPhotos]   = useState([]);   // array of full imgUrl strings
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [lightbox, setLightbox] = useState(null);
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  const sentinelRef = useRef(null);
 
-  // Fetch all photos from editions/2024/ and shuffle on load
+  // Show a "back to top" button once the user has scrolled past one screen.
   useEffect(() => {
+    const onScroll = () => setShowTopBtn(window.scrollY > window.innerHeight * 0.6);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Fetch all photos in the target folder (archive/, or editions/<year>/) and shuffle on load.
+  useEffect(() => {
+    let cancelled = false;
     async function load() {
+      setLoading(true);
+      setVisibleCount(BATCH_SIZE);
       const { data, error } = await supabase.storage
         .from('images')
-        .list('editions/2024', { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+        .list(folder, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
 
-      if (data && !error) {
+      if (!cancelled && data && !error) {
         const urls = shuffle(
           data
-            .filter(f => /\.(jpe?g|png|webp)$/i.test(f.name))
-            .map(f => imgUrl(`editions/2024/${f.name}`))
+            .filter(f => f.id && /\.(jpe?g|png|webp)$/i.test(f.name))
+            .map(f => imgUrl(`${folder}/${f.name}`))
         );
         setPhotos(urls);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [folder]);
+
+  // Reveal more photos as the user scrolls near the bottom, instead of
+  // mounting every <img> (there can be hundreds) up front.
+  useEffect(() => {
+    if (visibleCount >= photos.length) return;
+    const onScroll = () => {
+      const el = sentinelRef.current;
+      if (!el) return;
+      if (el.getBoundingClientRect().top < window.innerHeight + 800) {
+        setVisibleCount(c => Math.min(c + BATCH_SIZE, photos.length));
+      }
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [photos.length, visibleCount]);
 
   const open = (i) => { setLightbox(i); document.body.style.overflow = 'hidden'; };
   const close = useCallback(() => { setLightbox(null); document.body.style.overflow = ''; }, []);
   const prev = useCallback(() => setLightbox(i => (i - 1 + photos.length) % photos.length), [photos.length]);
   const next = useCallback(() => setLightbox(i => (i + 1) % photos.length), [photos.length]);
+
+  const visiblePhotos = photos.slice(0, visibleCount);
+  const title = year ? `Editie ${year}` : 'Herinneringen';
+  const subtitle = year
+    ? `Alle foto's van de editie van ${year}.`
+    : "Openluchtfuif Pellenberg door de jaren heen — van de eerste editie tot vandaag.";
 
   return (
     <div style={{ background: 'var(--purple-deep)', minHeight: '100vh', color: 'var(--cream)' }}>
@@ -176,10 +220,10 @@ export default function Archive() {
           lineHeight: 0.88, letterSpacing: '-0.02em',
           marginBottom: 20,
         }}>
-          Herinneringen
+          {title}
         </h1>
         <p style={{ fontSize: 16, opacity: 0.6, maxWidth: 480 }}>
-          Openluchtfuif Pellenberg door de jaren heen — van de eerste editie tot vandaag.
+          {subtitle}
         </p>
       </div>
 
@@ -190,7 +234,7 @@ export default function Archive() {
         </div>
       ) : (
         <div className="archive-grid">
-          {photos.map((url, i) => (
+          {visiblePhotos.map((url, i) => (
             <div
               key={url}
               onClick={() => open(i)}
@@ -201,6 +245,7 @@ export default function Archive() {
                 overflow: 'hidden',
                 cursor: 'zoom-in',
                 position: 'relative',
+                minHeight: 220,
                 background: 'rgba(255,255,255,0.04)',
               }}
             >
@@ -227,6 +272,10 @@ export default function Archive() {
         </div>
       )}
 
+      {!loading && visibleCount < photos.length && (
+        <div ref={sentinelRef} style={{ height: 1 }} />
+      )}
+
       {/* Lightbox */}
       {lightbox !== null && (
         <Lightbox
@@ -237,6 +286,27 @@ export default function Archive() {
           onNext={next}
         />
       )}
+
+      {/* Back to top */}
+      <button
+        onClick={scrollToTop}
+        aria-label="Terug naar boven"
+        style={{
+          position: 'fixed', bottom: 28, left: '50%', zIndex: 200,
+          width: 52, height: 52, borderRadius: 999,
+          background: 'rgba(244,231,208,.12)', border: '1px solid rgba(244,231,208,.2)',
+          backdropFilter: 'blur(12px)',
+          color: 'var(--cream)', fontSize: 20, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: showTopBtn ? 1 : 0,
+          transform: showTopBtn ? 'translateX(-50%) translateY(0)' : 'translateX(-50%) translateY(12px)',
+          pointerEvents: showTopBtn ? 'auto' : 'none',
+          transition: 'opacity 0.25s, transform 0.25s, background 0.2s',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(244,231,208,.22)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,231,208,.12)'}
+      >↑</button>
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }

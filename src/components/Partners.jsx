@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, imgUrl } from '../utils/supabase';
 
-function PartnerLogo({ path, name, size = 72 }) {
+function PartnerLogo({ path, name, size = 96 }) {
   return (
     <div className="scatter-logo-wrap" style={{ width: size, height: size }}>
       <img
@@ -114,7 +114,7 @@ export default function Partners({ mode = 'live' }) {
                   >
                     {p.logo_path
                       ? <PartnerLogo path={p.logo_path} name={p.name} />
-                      : <div style={{ width: 72, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, opacity: 0.3 }}>{p.name}</div>
+                      : <div style={{ width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, opacity: 0.3 }}>{p.name}</div>
                     }
                     <span className="scatter-name">{p.name}</span>
                   </div>

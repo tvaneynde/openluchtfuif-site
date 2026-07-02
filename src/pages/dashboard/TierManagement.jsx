@@ -749,9 +749,9 @@ export default function TierManagement() {
           {[
             { label: 'Tiers', val: tiers.length },
             { label: 'Actief', val: tiers.filter(t => t.is_active).length },
-            { label: 'Totale capaciteit', val: tiers.reduce((a, t) => a + t.total_capacity, 0) },
+            { label: 'Totale capaciteit', val: tiers.reduce((a, t) => a + (t.is_door_sale ? 0 : t.total_capacity), 0) },
             { label: 'Totaal verkocht', val: tiers.reduce((a, t) => a + t.sold_count, 0) },
-            { label: 'Beschikbaar', val: tiers.reduce((a, t) => a + (t.total_capacity - t.sold_count), 0) },
+            { label: 'Beschikbaar', val: tiers.reduce((a, t) => a + (t.is_door_sale ? 0 : (t.total_capacity - t.sold_count)), 0) },
           ].map(({ label, val }) => (
             <div key={label} style={{ paddingRight: 20, borderRight: '1px solid rgba(244,231,208,0.08)', lastChild: { border: 'none' } }}>
               <div style={{ ...s.mono, fontSize: 9, opacity: 0.45, marginBottom: 4 }}>{label.toUpperCase()}</div>

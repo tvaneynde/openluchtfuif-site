@@ -16,7 +16,7 @@ export default function Faq({ mode = 'coming_soon' }) {
   }, [mode]);
 
   return (
-    <section id="faq">
+    <section id="faq" className="section-glow glow-faq">
       <div className="section-head">
         <span className="section-num">07 / Vragen</span>
         <h2 className="section-title">FAQ</h2>

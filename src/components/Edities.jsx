@@ -1,3 +1,5 @@
+import { imgUrl } from '../utils/supabase';
+
 function Star() {
   return (
     <svg className="star" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -13,7 +15,7 @@ const EDITIONS = [
     attendees: "",
     tag: "Latest",
     photo: `${import.meta.env.BASE_URL}assets/photo-1.jpg`,
-    link: "",
+    archiveLink: "#/archief/2025",
   },
   {
     year: "2024",
@@ -21,14 +23,14 @@ const EDITIONS = [
     attendees: "",
     tag: "",
     photo: `${import.meta.env.BASE_URL}assets/photo-3.jpg`,
-    link: "",
+    archiveLink: "#/archief/2024",
   },
   {
     year: "1981–2008",
     theme: "De Gouden Jaren",
     attendees: "17 edities",
     tag: "Heritage",
-    photo: `${import.meta.env.BASE_URL}assets/photo-6.jpg`,
+    photo: imgUrl('archive/2e8bd41a-34bc-4582-831e-8f359fed0c6c.jpg'),
     archiveLink: "#/archief",
   },
 ];

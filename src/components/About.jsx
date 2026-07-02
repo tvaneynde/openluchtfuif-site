@@ -1,6 +1,6 @@
 export default function About() {
   return (
-    <section id="about">
+    <section id="about" className="section-glow glow-about">
       <div className="section-head">
         <span className="section-num">08 / Wie zijn wij</span>
         <h2 className="section-title">Over ons</h2>

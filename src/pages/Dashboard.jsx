@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import TierManagement from './dashboard/TierManagement.jsx';
 import OrdersTable from './dashboard/OrdersTable.jsx';
@@ -75,7 +75,7 @@ function MetricCard({ label, value, sub, loading }) {
 // ─── Tier breakdown card ──────────────────────────────────────────────────────
 
 function TierCard({ tier }) {
-  const pct = tier.total_capacity > 0
+  const pct = !tier.is_door_sale && tier.total_capacity > 0
     ? Math.min(100, (tier.sold_count / tier.total_capacity) * 100)
     : 0;
   const revenue = tier.sold_count * (tier.price_cents || 0);
@@ -107,18 +107,22 @@ function TierCard({ tier }) {
           {tier.sold_count}
         </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'rgba(244,231,208,0.4)', marginLeft: 6 }}>
-          / {tier.total_capacity}
+          {tier.is_door_sale ? 'onbeperkt' : `/ ${tier.total_capacity}`}
         </span>
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 6, borderRadius: 999, background: 'rgba(244,231,208,0.1)', overflow: 'hidden', marginBottom: 12 }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 999, transition: 'width 0.5s' }} />
-      </div>
+      {!tier.is_door_sale && (
+        <div style={{ height: 6, borderRadius: 999, background: 'rgba(244,231,208,0.1)', overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 999, transition: 'width 0.5s' }} />
+        </div>
+      )}
 
       {/* Revenue */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ ...MONO, color: 'rgba(244,231,208,0.35)' }}>{pct.toFixed(0)}% VERKOCHT</span>
+        <span style={{ ...MONO, color: 'rgba(244,231,208,0.35)' }}>
+          {tier.is_door_sale ? 'AAN DE DEUR' : `${pct.toFixed(0)}% VERKOCHT`}
+        </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--orange-bright)', letterSpacing: '0.04em' }}>
           {fmtEuro(revenue)}
         </span>
@@ -200,7 +204,7 @@ function Overview() {
       // Tiers
       const { data: tiers } = await supabase
         .from('ticket_tiers')
-        .select('id, name, sold_count, total_capacity, price_cents, fee_cents, is_active')
+        .select('id, name, sold_count, total_capacity, price_cents, fee_cents, is_active, is_door_sale')
         .order('sort_order');
 
       if (tiers) {
@@ -357,7 +361,7 @@ function Overview() {
 
   // ── derived metrics ──
   const totalSold = tiersData.reduce((a, t) => a + (t.sold_count || 0), 0);
-  const totalCapacity = tiersData.reduce((a, t) => a + (t.total_capacity || 0), 0);
+  const totalCapacity = tiersData.reduce((a, t) => a + (t.is_door_sale ? 0 : (t.total_capacity || 0)), 0);
   const pctDoorPoort = totalSold > 0 && scannedToday != null
     ? ((scannedToday / totalSold) * 100).toFixed(1)
     : null;
@@ -898,7 +902,7 @@ function NavItem({ to, label, icon }) {
   const navigate = useNavigate();
   const active = to === '/dashboard'
     ? location.pathname === '/dashboard' || location.pathname === '/dashboard/'
-    : location.pathname.startsWith(to);
+    : location.pathname === to || location.pathname.startsWith(to + '/');
 
   return (
     <button
@@ -983,10 +987,14 @@ function Sidebar({ onSignOut }) {
     <div style={{
       width: '240px',
       minWidth: '240px',
-      minHeight: '100vh',
+      height: '100vh',
+      position: 'sticky',
+      top: 0,
+      alignSelf: 'flex-start',
       background: '#1e0b28',
       display: 'flex',
       flexDirection: 'column',
+      overflowY: 'auto',
       borderRight: '1px solid rgba(255,255,255,0.07)',
       boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.06)',
       padding: '0',
@@ -1026,8 +1034,39 @@ function Sidebar({ onSignOut }) {
         <NavItem to="/dashboard/content" label="Content" icon="✎" />
       </nav>
 
-      {/* Sign out + version */}
+      {/* Back to site + sign out + version */}
       <div style={{ padding: '16px 16px 28px' }}>
+        <Link
+          to="/"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
+            padding: '10px 16px',
+            marginBottom: '8px',
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            color: 'rgba(244,231,208,0.45)',
+            fontFamily: 'var(--body)',
+            fontSize: '0.86rem',
+            textDecoration: 'none',
+            boxSizing: 'border-box',
+            transition: 'color 0.15s ease, border-color 0.15s ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = 'var(--orange-bright)';
+            e.currentTarget.style.borderColor = 'rgba(240,140,40,0.4)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'rgba(244,231,208,0.45)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+          }}
+        >
+          <span>←</span> Terug naar site
+        </Link>
+
         <button
           onClick={onSignOut}
           style={{
@@ -1131,11 +1170,11 @@ export default function Dashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#1e0b28', fontFamily: 'var(--body)' }}>
+    <div style={{ height: '100vh', display: 'flex', overflowY: 'auto', background: '#1e0b28', fontFamily: 'var(--body)' }}>
       <div className="dash-sidebar">
         <Sidebar onSignOut={handleSignOut} />
       </div>
-      <div className="dash-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto' }}>
+      <div className="dash-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <TopBar session={session} />
         <main style={{ flex: 1 }}>
           <Routes>

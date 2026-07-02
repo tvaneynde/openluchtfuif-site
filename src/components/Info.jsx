@@ -15,7 +15,7 @@ export default function Info({ mode = 'coming_soon' }) {
   }, [mode]);
 
   return (
-    <section id="info" style={{ background: "var(--purple-deep)" }}>
+    <section id="info" className="section-glow glow-info" style={{ background: "var(--purple-deep)" }}>
       <div className="section-head">
         <span className="section-num">06 / Praktisch</span>
         <h2 className="section-title">Info</h2>
