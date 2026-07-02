@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
     .single()
 
   if (!tier) return err('Ticket tier not found or inactive', 404)
+  if (tier.is_door_sale) return err('This tier is only available at the door', 400)
 
   const now = new Date()
   if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) return err('Tickets are not on sale yet')

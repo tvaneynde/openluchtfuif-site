@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   sale_starts_at: '',
   sale_ends_at: '',
   is_active: false,
+  is_door_sale: false,
   sort_order: 0,
 };
 
@@ -431,6 +432,17 @@ function TierForm({ initial, onSave, onCancel, saving, error }) {
             </span>
           </div>
         </div>
+        <div style={{ ...s.formGroup, gridColumn: '1 / -1' }}>
+          <label style={s.label}>Deurverkoop</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Toggle checked={form.is_door_sale} onChange={val => set('is_door_sale', val)} />
+            <span style={{ fontSize: 13, opacity: 0.7 }}>
+              {form.is_door_sale
+                ? 'Alleen aan de kassa — niet online te koop, geen checkout-knop'
+                : 'Gewone tier — online te koop via checkout'}
+            </span>
+          </div>
+        </div>
       </div>
       <div style={s.modalFooter}>
         <button type="button" style={s.btnSecondary} onClick={onCancel} disabled={saving}>
@@ -471,6 +483,16 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
               }} />
               {tier.is_active ? 'ACTIEF' : 'INACTIEF'}
             </button>
+            {tier.is_door_sale && (
+              <span style={{
+                ...s.mono, fontSize: 10, letterSpacing: '0.12em',
+                padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(244,231,208,0.08)', color: 'rgba(244,231,208,0.55)',
+                border: '1px solid rgba(244,231,208,0.15)',
+              }}>
+                DEURVERKOOP
+              </span>
+            )}
           </div>
           {tier.description && (
             <p style={{ margin: 0, opacity: 0.55, fontSize: 13, maxWidth: 480 }}>{tier.description}</p>
@@ -494,19 +516,23 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
           <div style={s.statLabel}>Totaal</div>
           <div style={s.statValue}>{fmtEuro(tier.price_cents + tier.fee_cents)}</div>
         </div>
-        <div style={s.stat}>
-          <div style={s.statLabel}>Capaciteit</div>
-          <div style={s.statValue}>{tier.total_capacity}</div>
-        </div>
-        <div style={{ ...s.stat, background: remaining <= 0 ? 'rgba(220,60,60,0.12)' : remaining < 20 ? 'rgba(240,140,40,0.12)' : 'rgba(0,0,0,0.2)' }}>
-          <div style={s.statLabel}>Beschikbaar</div>
-          <div style={{ ...s.statValue, color: remaining <= 0 ? '#ff7070' : remaining < 20 ? 'var(--orange)' : 'var(--cream)' }}>
-            {remaining}
-          </div>
-        </div>
+        {!tier.is_door_sale && (
+          <>
+            <div style={s.stat}>
+              <div style={s.statLabel}>Capaciteit</div>
+              <div style={s.statValue}>{tier.total_capacity}</div>
+            </div>
+            <div style={{ ...s.stat, background: remaining <= 0 ? 'rgba(220,60,60,0.12)' : remaining < 20 ? 'rgba(240,140,40,0.12)' : 'rgba(0,0,0,0.2)' }}>
+              <div style={s.statLabel}>Beschikbaar</div>
+              <div style={{ ...s.statValue, color: remaining <= 0 ? '#ff7070' : remaining < 20 ? 'var(--orange)' : 'var(--cream)' }}>
+                {remaining}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      <ProgressBar sold={tier.sold_count} total={tier.total_capacity} />
+      {!tier.is_door_sale && <ProgressBar sold={tier.sold_count} total={tier.total_capacity} />}
 
       {(tier.sale_starts_at || tier.sale_ends_at) && (
         <div style={{ marginTop: 12, display: 'flex', gap: 24, opacity: 0.5 }}>
@@ -622,6 +648,7 @@ export default function TierManagement() {
       sale_starts_at: form.sale_starts_at || null,
       sale_ends_at: form.sale_ends_at || null,
       is_active: form.is_active,
+      is_door_sale: form.is_door_sale,
       sort_order: parseInt(form.sort_order, 10) || 0,
     };
   }
@@ -653,6 +680,7 @@ export default function TierManagement() {
         sale_starts_at: fmtDatetimeLocal(tier.sale_starts_at),
         sale_ends_at: fmtDatetimeLocal(tier.sale_ends_at),
         is_active: tier.is_active,
+        is_door_sale: tier.is_door_sale,
         sort_order: tier.sort_order,
       },
     });

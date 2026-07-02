@@ -28,6 +28,7 @@ export default function Checkout() {
       .from('ticket_tiers')
       .select('*')
       .eq('is_active', true)
+      .eq('is_door_sale', false)
       .order('sort_order')
       .then(({ data }) => {
         if (data) {

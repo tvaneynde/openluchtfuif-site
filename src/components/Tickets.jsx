@@ -85,18 +85,18 @@ function TicketStub({ tier, index }) {
   );
 }
 
-function DoorTicket() {
+function DoorTicket({ tier }) {
   return (
     <div className="ticket-stub status-door" style={{ '--rot': '-0.9deg' }}>
       <div className="ticket-main">
         <div className="ticket-kicker mono">Aan de kassa</div>
-        <h3 className="ticket-name">Deurverkoop</h3>
+        <h3 className="ticket-name">{tier.name}</h3>
         <div className="ticket-price-row">
-          <span className="ticket-price">€20</span>
+          <span className="ticket-price">€{formatPrice(tier.price_cents)}</span>
           <span className="ticket-fee mono">als er nog plek is</span>
         </div>
         <p className="ticket-desc">
-          Beperkt beschikbaar aan de deur — vroeger boeken is zekerder.
+          {tier.description || 'Beperkt beschikbaar aan de deur.'}
         </p>
       </div>
 
@@ -172,8 +172,12 @@ export default function Tickets({ mode = 'live' }) {
               [0, 1, 2].map(i => <TicketSkeleton key={i} index={i} />)
             ) : (
               <>
-                {tiers.map((tier, i) => <TicketStub key={tier.id} tier={tier} index={i} />)}
-                <DoorTicket />
+                {tiers.filter(t => !t.is_door_sale).map((tier, i) => (
+                  <TicketStub key={tier.id} tier={tier} index={i} />
+                ))}
+                {tiers.filter(t => t.is_door_sale).map(tier => (
+                  <DoorTicket key={tier.id} tier={tier} />
+                ))}
               </>
             )}
           </div>
