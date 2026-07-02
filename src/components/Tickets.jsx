@@ -1,76 +1,148 @@
-function TicketEarlyBird() {
+import { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase';
+
+function formatPrice(cents) {
+  const value = cents / 100;
+  return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace('.', ',');
+}
+
+function tierStatus(tier) {
+  const now = new Date();
+  const remaining = tier.total_capacity - (tier.sold_count ?? 0);
+  if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) return 'soon';
+  if (tier.sale_ends_at && new Date(tier.sale_ends_at) < now) return 'closed';
+  if (remaining <= 0) return 'soldout';
+  if (remaining <= 20) return 'low';
+  return 'open';
+}
+
+const STATUS_LABEL = {
+  open: 'Nu te koop',
+  low: 'Bijna vol',
+  soldout: 'Uitverkocht',
+  soon: 'Binnenkort',
+  closed: 'Verkoop gesloten',
+};
+
+const ROTATIONS = [-1.6, 1.1, -0.7, 1.4];
+
+function TicketStub({ tier, index }) {
+  const sold = tier.sold_count ?? 0;
+  const remaining = Math.max(0, tier.total_capacity - sold);
+  const pctSold = Math.min(100, Math.round((sold / tier.total_capacity) * 100));
+  const status = tierStatus(tier);
+  const disabled = status === 'soldout' || status === 'soon' || status === 'closed';
+
+  const meterLabel = status === 'low'
+    ? `Nog maar ${remaining} over`
+    : status === 'soldout'
+      ? 'Geen tickets meer'
+      : STATUS_LABEL[status];
+
   return (
-    <div className="tkt tkt-early">
-      <div className="tkt-top">
-        <div className="tkt-badge">Vroegvogel</div>
-        <div className="tkt-label mono">Beperkt aantal</div>
+    <div
+      className={`ticket-stub status-${status}`}
+      style={{ '--rot': `${ROTATIONS[index % ROTATIONS.length]}deg` }}
+    >
+      {status === 'soldout' && <div className="ticket-stamp">Uitverkocht</div>}
+
+      <div className="ticket-main">
+        <div className="ticket-kicker mono">Toegangsbewijs · Editie XIV</div>
+        <h3 className="ticket-name">{tier.name}</h3>
+        <div className="ticket-price-row">
+          <span className="ticket-price">€{formatPrice(tier.price_cents)}</span>
+          <span className="ticket-fee mono">+ €{formatPrice(tier.fee_cents)} kosten</span>
+        </div>
+        <p className="ticket-desc">
+          {tier.description || 'Toegang tot de volledige avond.'}
+        </p>
+
+        <div className="ticket-meter">
+          <div className="ticket-meter-fill" style={{ width: `${pctSold}%` }} />
+        </div>
+        <div className="ticket-meter-label mono">
+          <span className={status === 'low' || status === 'soldout' ? 'urgent' : ''}>{meterLabel}</span>
+        </div>
       </div>
-      <div className="tkt-price-block">
-        <span className="tkt-currency">€</span>
-        <span className="tkt-price">12</span>
+
+      <div className="ticket-tear">
+        <span className="ticket-notch ticket-notch-top" />
+        <span className="ticket-notch ticket-notch-bottom" />
       </div>
-      <div className="tkt-divider" />
-      <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.7, margin: "4px 0 0", flex: 1 }}>
-        De goedkoopste manier om erbij te zijn. Wie vroeg boekt, betaalt minder — zo simpel is het.
-      </p>
-      <a href="#/checkout" className="tkt-btn tkt-btn-cream">Bestel nu →</a>
+
+      <div className="ticket-stub-side">
+        <div className="ticket-vertical mono">Admit one</div>
+        <div className="ticket-barcode" aria-hidden="true" />
+        {disabled ? (
+          <span className="ticket-cta disabled">
+            {status === 'soldout' ? 'Vol' : status === 'soon' ? '...' : 'Dicht'}
+          </span>
+        ) : (
+          <a href={`/#/checkout?tier_id=${tier.id}`} className="ticket-cta">Koop →</a>
+        )}
+      </div>
     </div>
   );
 }
 
-function TicketWaves() {
-  const waves = [
-    { label: "Golf 1", price: "€12", status: "vol" },
-    { label: "Golf 2", price: "€14", status: "vol" },
-    { label: "Golf 3", price: "€16", status: "actief" },
-    { label: "Golf 4", price: "€18", status: "binnenkort" },
-  ];
+function DoorTicket() {
   return (
-    <div className="tkt tkt-waves">
-      <div className="tkt-top">
-        <div className="tkt-badge">Voorverkoop</div>
-        <div className="tkt-label mono">Prijs stijgt per golf</div>
+    <div className="ticket-stub status-door" style={{ '--rot': '-0.9deg' }}>
+      <div className="ticket-main">
+        <div className="ticket-kicker mono">Aan de kassa</div>
+        <h3 className="ticket-name">Deurverkoop</h3>
+        <div className="ticket-price-row">
+          <span className="ticket-price">€20</span>
+          <span className="ticket-fee mono">als er nog plek is</span>
+        </div>
+        <p className="ticket-desc">
+          Beperkt beschikbaar aan de deur — vroeger boeken is zekerder.
+        </p>
       </div>
-      <div className="tkt-wave-list">
-        {waves.map(w => (
-          <div key={w.label} className={`tkt-wave-row ${w.status}`}>
-            <span className="tkt-wave-label">{w.label}</span>
-            <span className="tkt-wave-price">{w.price}</span>
-            <span className={`tkt-wave-status mono ${w.status}`}>
-              {w.status === "vol" ? "Vol" : w.status === "actief" ? "● Nu" : "Binnenkort"}
-            </span>
-          </div>
-        ))}
+
+      <div className="ticket-tear">
+        <span className="ticket-notch ticket-notch-top" />
+        <span className="ticket-notch ticket-notch-bottom" />
       </div>
-      <div className="tkt-divider" />
-      <a href="#/checkout" className="tkt-btn tkt-btn-cream">Golf 3 kopen →</a>
+
+      <div className="ticket-stub-side">
+        <div className="ticket-vertical mono">Misschien</div>
+        <div className="ticket-barcode" aria-hidden="true" />
+        <a href="#tickets" className="ticket-cta disabled">Info</a>
+      </div>
     </div>
   );
 }
 
-function TicketDoor() {
+function TicketSkeleton({ index }) {
   return (
-    <div className="tkt tkt-door">
-      <div className="tkt-top">
-        <div className="tkt-badge" style={{ background: "rgba(244,231,208,.12)", color: "rgba(244,231,208,.5)", border: "1px solid rgba(244,231,208,.15)" }}>Aan de kassa</div>
-        <div className="tkt-label mono">Als er nog plek is</div>
+    <div className="ticket-stub ticket-skeleton" style={{ '--rot': `${ROTATIONS[index % ROTATIONS.length]}deg` }}>
+      <div className="ticket-main">
+        <div className="ticket-skel-line" style={{ width: '50%', height: 10 }} />
+        <div className="ticket-skel-line" style={{ width: '70%', height: 32, margin: '14px 0' }} />
+        <div className="ticket-skel-line" style={{ width: '40%', height: 24 }} />
       </div>
-      <div className="tkt-price-block" style={{ opacity: 0.45 }}>
-        <span className="tkt-currency">€</span>
-        <span className="tkt-price">20</span>
-      </div>
-      <div className="tkt-divider" />
-      <p style={{ fontSize: 14, lineHeight: 1.6, opacity: 0.5, marginBottom: 24, flex: 1 }}>
-        Contant betalen aan de ingang. Geen garantie op toegang — koop op voorhand om zeker te zijn van je plek.
-      </p>
-      <a href="#tickets" className="tkt-btn" style={{ background: "transparent", border: "1px solid rgba(244,231,208,.2)", color: "rgba(244,231,208,.4)" }}>
-        Meer info
-      </a>
     </div>
   );
 }
 
 export default function Tickets({ mode = 'live' }) {
+  const [tiers, setTiers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (mode !== 'live' || !supabase) { setLoading(false); return; }
+    supabase
+      .from('ticket_tiers')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order')
+      .then(({ data }) => {
+        if (data) setTiers(data);
+        setLoading(false);
+      });
+  }, [mode]);
+
   return (
     <section id="tickets">
       <div className="section-head">
@@ -94,11 +166,18 @@ export default function Tickets({ mode = 'live' }) {
           <p style={{ fontSize: 18, maxWidth: 640, marginBottom: 56, opacity: 0.85 }}>
             Hoe vroeger, hoe goedkoper.
           </p>
+
           <div className="tickets-grid">
-            <TicketEarlyBird />
-            <TicketWaves />
-            <TicketDoor />
+            {loading ? (
+              [0, 1, 2].map(i => <TicketSkeleton key={i} index={i} />)
+            ) : (
+              <>
+                {tiers.map((tier, i) => <TicketStub key={tier.id} tier={tier} index={i} />)}
+                <DoorTicket />
+              </>
+            )}
           </div>
+
           <div className="tkt-notice">
             <span>-18? Kom met ID.</span>
             <span>Alcohol &lt;16 = nee</span>

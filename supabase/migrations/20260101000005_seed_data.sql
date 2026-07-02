@@ -15,12 +15,12 @@ INSERT INTO admin_users (email) VALUES
   ('tomasvaneynde@gmail.com')
 ON CONFLICT (email) DO NOTHING;
 
--- Test ticket tier: Vroegvogel
+-- Test ticket tier: Early Bird
 INSERT INTO ticket_tiers (
   name, description, price_cents, fee_cents,
   total_capacity, is_active, sort_order
 ) VALUES (
-  'Vroegvogel',
+  'Early Bird',
   'De goedkoopste manier om erbij te zijn. Beperkt aantal beschikbaar.',
   1200,   -- €12.00
   50,     -- €0.50 fee to cover Mollie costs

@@ -623,159 +623,230 @@ section { position: relative; padding: 120px 40px; }
 /* ---- Tickets ---- */
 .tickets-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 28px 24px;
   align-items: stretch;
 }
 
-/* Base ticket card */
-.tkt {
-  border-radius: 28px;
-  padding: 32px 28px;
-  display: flex;
-  flex-direction: column;
-  min-height: 460px;
+/* Ticket stub — a literal paper ticket, torn stub on the right,
+   printed on cream stock against the dark risograph wash. */
+.ticket-stub {
   position: relative;
-  overflow: hidden;
-  transition: transform .3s cubic-bezier(.2,.8,.2,1);
+  display: flex;
+  min-height: 400px;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 18px;
+  box-shadow: 0 4px 0 rgba(0,0,0,.08), 0 22px 40px -12px rgba(10,2,15,.55);
+  transform: rotate(var(--rot));
+  transition: transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s;
 }
-.tkt:hover { transform: translateY(-6px); }
-
-/* Early bird */
-.tkt-early {
-  background: rgba(26,8,32,0.5);
-  color: var(--cream);
-  border: 1px solid rgba(244,231,208,.15);
-}
-
-/* Waves — featured */
-.tkt-waves {
-  background: rgba(26,8,32,0.5);
-  color: var(--cream);
-  border: 1px solid rgba(240,122,60,.4);
+.ticket-stub:hover {
+  transform: rotate(0deg) translateY(-8px);
+  box-shadow: 0 4px 0 rgba(0,0,0,.08), 0 32px 54px -14px rgba(10,2,15,.6);
 }
 
-/* Door */
-.tkt-door {
-  background: rgba(26,8,32,0.5);
-  color: var(--cream);
-  border: 1px solid rgba(244,231,208,.15);
-}
-
-/* Shared internals */
-.tkt-top {
+.ticket-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 30px 100px 26px 28px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
 }
-.tkt-badge {
+
+.ticket-kicker {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.ticket-name {
   font-family: var(--display);
-  font-size: 36px;
+  font-size: clamp(26px, 3.4vw, 38px);
   line-height: 0.95;
-  background: var(--orange);
-  color: var(--cream);
-  display: inline-block;
-  padding: 6px 18px 8px;
-  border-radius: 999px;
-  align-self: flex-start;
+  color: var(--purple-deep);
+  margin-bottom: 14px;
 }
-.tkt-label { font-size: 11px; letter-spacing: 0.18em; opacity: 0.6; }
 
-.tkt-price-block {
+.ticket-price-row {
   display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  margin-bottom: 4px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 14px;
 }
-.tkt-currency {
+.ticket-price {
   font-family: var(--display);
-  font-size: 32px;
+  font-size: 42px;
   line-height: 1;
-  margin-top: 10px;
+  color: var(--orange);
 }
-.tkt-price {
-  font-family: var(--display);
-  font-size: 100px;
-  line-height: 0.85;
-  letter-spacing: -0.02em;
-}
-
-.tkt-divider {
-  border: none;
-  border-top: 1px dashed rgba(244,231,208,.2);
-  margin: 20px 0;
-}
-
-.tkt-perks {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 28px;
-  flex: 1;
-}
-.tkt-perks li { font-size: 14px; line-height: 1.4; opacity: 0.8; }
-
-.tkt-btn {
-  display: block;
-  text-align: center;
-  padding: 16px 24px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 15px;
+.ticket-fee {
+  font-size: 10.5px;
   letter-spacing: 0.03em;
-  text-decoration: none;
-  transition: opacity .2s, transform .2s;
-  border: none;
-  cursor: pointer;
-  font-family: var(--body);
+  opacity: 0.55;
 }
-.tkt-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-.tkt-btn-dark { background: var(--purple-deep); color: var(--cream); }
-.tkt-btn-cream { background: var(--cream); color: var(--purple-deep); }
 
-/* Wave rows */
-.tkt-wave-list {
+.ticket-desc {
+  font-size: 13.5px;
+  line-height: 1.55;
+  opacity: 0.72;
+  margin-bottom: 20px;
+  flex: 1;
+}
+
+.ticket-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(42,15,51,.1);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.ticket-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--orange);
+  transition: width .6s ease;
+}
+.status-low .ticket-meter-fill,
+.status-soldout .ticket-meter-fill { background: #c23b2b; }
+
+.ticket-meter-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.ticket-meter-label .urgent { color: #c23b2b; opacity: 1; font-weight: 700; }
+
+/* Perforated tear line + punched notches, floating between
+   the main stub and the torn admission strip */
+.ticket-tear {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 92px;
+  width: 0;
+  border-left: 2px dashed rgba(42,15,51,.25);
+}
+.ticket-notch {
+  position: absolute;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--purple-deep);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,.35);
+}
+.ticket-notch-top { top: 0; }
+.ticket-notch-bottom { top: 100%; }
+
+/* Torn admission strip on the right */
+.ticket-stub-side {
+  width: 92px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  flex: 1;
-  margin-bottom: 24px;
-}
-.tkt-wave-row {
-  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 24px 0 20px;
   gap: 16px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(244,231,208,.08);
-  opacity: 0.35;
 }
-.tkt-wave-row.actief { opacity: 1; }
-.tkt-wave-row.binnenkort { opacity: 0.5; }
-.tkt-wave-label {
+.ticket-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9.5px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+.ticket-barcode {
+  width: 26px;
+  height: 64px;
+  opacity: 0.5;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--ink) 0 2px, transparent 2px 4px,
+    var(--ink) 4px 5px, transparent 5px 8px,
+    var(--ink) 8px 10px, transparent 10px 12px,
+    var(--ink) 12px 14px, transparent 14px 17px
+  );
+}
+.ticket-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--purple-deep);
+  color: var(--cream);
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  width: 56px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: transform .2s, background .2s;
   flex-shrink: 0;
 }
-.tkt-wave-price {
-  font-family: var(--display);
-  font-size: 36px;
-  line-height: 1;
-  flex: 1;
+.ticket-cta:hover { transform: scale(1.08); background: var(--orange); }
+.ticket-cta.disabled {
+  background: rgba(42,15,51,.08);
+  color: rgba(42,15,51,.35);
+  pointer-events: none;
 }
-.tkt-wave-status {
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  padding: 4px 12px;
-  border-radius: 999px;
+
+/* Sold-out ink stamp */
+.ticket-stamp {
+  position: absolute;
+  top: 40%;
+  left: 6%;
+  z-index: 2;
+  transform: rotate(-13deg);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+  border: 3px solid var(--orange);
+  border-radius: 8px;
+  padding: 6px 14px;
+  opacity: 0.85;
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
-.tkt-wave-status.vol { background: rgba(244,231,208,.08); color: rgba(244,231,208,.4); }
-.tkt-wave-status.actief { background: var(--orange); color: var(--cream); }
-.tkt-wave-status.binnenkort { background: rgba(244,231,208,.06); color: rgba(244,231,208,.35); }
+
+.status-soldout .ticket-name,
+.status-soldout .ticket-price { opacity: 0.4; }
+
+/* Door / cash option — muted, informational, not a real inventory item */
+.status-door { opacity: 0.85; }
+.status-door .ticket-name,
+.status-door .ticket-price { color: rgba(42,15,51,.55); }
+.status-door .ticket-cta {
+  background: transparent;
+  border: 2px solid rgba(42,15,51,.25);
+  color: rgba(42,15,51,.45);
+}
+
+/* Loading skeleton */
+.ticket-skeleton { background: rgba(244,231,208,.06); box-shadow: none; }
+.ticket-skel-line {
+  border-radius: 6px;
+  background: rgba(244,231,208,.12);
+  animation: ticket-skel-pulse 1.5s ease-in-out infinite;
+}
+@keyframes ticket-skel-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
 
 /* Notice bar */
 .tkt-notice {
@@ -1137,8 +1208,12 @@ footer {
   .hero-cta .btn { font-size: 15px; padding: 16px 28px; }
 
   /* Tickets */
-  .tkt { min-height: unset; padding: 28px 22px; }
-  .tkt-price { font-size: 72px; }
+  .ticket-stub { min-height: unset; }
+  .ticket-main { padding: 26px 84px 22px 22px; }
+  .ticket-tear { right: 76px; }
+  .ticket-stub-side { width: 76px; }
+  .ticket-price { font-size: 36px; }
+  .ticket-name { font-size: clamp(24px, 6vw, 32px); }
 
   /* Edities */
   .edition-card.hero { height: 340px; }
@@ -1179,9 +1254,12 @@ footer {
   .hero-cta .btn { font-size: 14px; padding: 14px 20px; }
 
   /* Tickets */
-  .tkt { padding: 24px 18px; }
-  .tkt-price { font-size: 60px; }
-  .tkt-currency { font-size: 24px; margin-top: 8px; }
+  .ticket-main { padding: 22px 72px 20px 18px; }
+  .ticket-tear { right: 64px; }
+  .ticket-stub-side { width: 64px; }
+  .ticket-cta { width: 50px; height: 50px; font-size: 10px; }
+  .ticket-price { font-size: 30px; }
+  .ticket-barcode { height: 44px; }
 
   /* Footer — single column */
   .footer-grid { grid-template-columns: 1fr; }

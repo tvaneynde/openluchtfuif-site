@@ -3,7 +3,7 @@ export default function Ticker() {
     "◉ 29 Augustus 2026",
     "◉ Pellenberg — Jeugdhuis De Kluster",
     "◉ 16:00 → 03:00",
-    "◉ Vroegvogels nu te koop",
+    "◉ Early birds nu te koop",
     "◉ Editie 14",
     "◉ Geen glas · Geen plastic · Alles herbruikbaar",
   ];
