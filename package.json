@@ -1,6 +1,6 @@
 {
   "name": "temp-vite",
-  "homepage": "https://tvaneynde.github.io/openluchtfuif-site/",
+  "homepage": "https://openluchtfuif3212.be",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,8 +9,7 @@
     "build": "node --require ./node-polyfill.cjs ./node_modules/.bin/vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "echo 'Deploys happen automatically on push to main (Cloudflare Pages). The old gh-pages script is gone: vite base is \"/\" now, so a gh-pages build 404s on every asset.' && exit 1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",

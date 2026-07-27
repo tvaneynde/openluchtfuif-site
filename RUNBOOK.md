@@ -9,8 +9,8 @@
 
 | System | URL | Login |
 |---|---|---|
-| **Dashboard** | https://tvaneynde.github.io/openluchtfuif-site/#/dashboard | tomas@vaneynde.eu |
-| **Scanner** | https://tvaneynde.github.io/openluchtfuif-site/#/scanner | PIN (zie dashboard → Scanner tab) |
+| **Dashboard** | https://openluchtfuif3212.be/#/dashboard | tomas@vaneynde.eu |
+| **Scanner** | https://openluchtfuif3212.be/#/scanner | PIN (zie dashboard → Scanner tab) |
 | **Supabase** | https://supabase.com/dashboard/project/noihnuouftyvsvzybwer | Supabase account |
 | **Mollie** | https://www.mollie.com/dashboard | Mollie account |
 | **Resend** | https://resend.com/dashboard | Resend account |
@@ -104,7 +104,7 @@ Stuur deze link door aan de klant zodat hij/zij de PDF zelf kan downloaden.
 4. Alle scanner-sessies worden automatisch ongeldig (PIN-cache vervalt na max. 5 minuten)
 5. Briefer alle vrijwilligers met scanners: zij moeten de nieuwe PIN invullen
 
-> De scanner-app zit op https://tvaneynde.github.io/openluchtfuif-site/#/scanner — geen installatie nodig, werkt als PWA in de browser.
+> De scanner-app zit op https://openluchtfuif3212.be/#/scanner — geen installatie nodig, werkt als PWA in de browser.
 
 ---
 
@@ -120,6 +120,58 @@ Stuur deze link door aan de klant zodat hij/zij de PDF zelf kan downloaden.
 | Nieuwe tier aanmaken | "Nieuw tier" knop → vul naam, prijs en capaciteit in |
 
 > Let op: deactiveer een tier meteen als het event vol is, zodat er geen nieuwe bestellingen meer binnenkomen.
+
+---
+
+## 5b. Gratis tickets voor sponsors en de partnerruil
+
+**Dashboard → Gratis tickets**
+
+Dit zijn echte tickets met een werkende QR, maar ze worden geboekt op de
+onzichtbare tier "Gratis ticket". Daardoor bewegen de omzet, de verkoopcijfers en
+de publieke beschikbaarheid niet mee. Ze tellen wél mee in **Verwachte opkomst**
+op het hoofddashboard, want het zijn echte mensen op het terrein.
+
+**Er is geen limiet** op hoeveel je weggeeft. Het onderscheid tussen sponsor,
+partnerruil en crew zit in de **reden** per uitgifte, niet in een quotum.
+
+**Tickets uitgeven** — knop **+ Tickets uitgeven** opent een pop-up:
+1. Naam + e-mail van de ontvanger
+2. **Aantal** — dit is de bulk-knop: 5 tickets voor één sponsor is één uitgifte
+   met aantal 5, in één e-mail. Snelkeuze 1 / 2 / 5 / 10, of typ een aantal.
+3. Reden (Sponsor / Partnerruil / Crew / Andere); de notitie is voor jezelf
+   (bv. "ruildeal 2026")
+4. Vink "Stuur de tickets meteen per e-mail" aan als de ontvanger ze zelf moet
+   krijgen. Laat het uit als je de PDF liever zelf doorstuurt — download hem dan
+   met de **PDF**-knop in de lijst.
+5. Dubbelklikken is veilig: dezelfde aanvraag wordt niet twee keer uitgegeven.
+
+Het dashboard triggert de e-mailworker meteen zelf en meldt of het gelukt is. Bij
+een verkoop doet `mollie-webhook` dat; gratis tickets hebben geen webhook, dus
+zonder die trigger bleef de mail hangen. Als de melding zegt dat de e-mail niet
+verstuurd kon worden: gebruik de **Mail**-knop op die regel.
+
+> De pg_cron-vangnet (`process-email-queue`, elke minuut) leest de service role
+> key uit Supabase Vault. Als die niet met `vault.create_secret('…',
+> 'service_role_key')` op productie gezet is, faalt het vangnet stil — controleer
+> `cron.job_run_details` als e-mails blijven hangen.
+
+Meer dan 500 in één keer wordt geweigerd. Dat is geen beleidsgrens maar een
+typfout-beveiliging — geef in dat geval twee keer uit.
+
+**Tickets intrekken** — knop **Intrekken** in de lijst. De tickets worden
+ongeldig en de teller gaat omlaag. Lukt niet meer zodra iemand met dat ticket
+door de poort is (`already_scanned`) — dan zou de opkomsttelling fout gaan.
+
+**Terreincapaciteit** — `venue_capacity` is puur informatief (het getal achter
+"Verwachte opkomst"); het blokkeert niets. Aanpassen:
+
+```sql
+UPDATE config SET value = '500'::jsonb WHERE key = 'venue_capacity';
+```
+
+> Gratis tickets kunnen **niet** via promocodes of de checkout ontstaan. De
+> `issue_comp_tickets`-RPC is de enige weg, en die vereist een admin-login.
 
 ---
 
@@ -162,7 +214,7 @@ Voer dit uit voor de deuren opengaan:
 
 - [ ] Scanner-PIN is ingesteld (Dashboard → Scanner tab)
 - [ ] Test een scan met een gekend geldig ticket
-- [ ] Alle scanners kunnen de PWA openen: https://tvaneynde.github.io/openluchtfuif-site/#/scanner
+- [ ] Alle scanners kunnen de PWA openen: https://openluchtfuif3212.be/#/scanner
 - [ ] Op iPhones/iPads: open in **Safari**, klik "Voeg toe aan beginscherm" voor offline PWA
 - [ ] Dashboard toont het correcte aantal verkochte tickets
 - [ ] Verifieer dat Mollie in **live modus** staat (niet testmodus)
@@ -244,4 +296,4 @@ Scanner-app → scan (Edge Function)
 
 **Supabase project ID:** `noihnuouftyvsvzybwer`
 **Webhook URL (Mollie instelling):** `https://noihnuouftyvsvzybwer.supabase.co/functions/v1/mollie-webhook`
-**Frontend:** https://tvaneynde.github.io/openluchtfuif-site/
+**Frontend:** https://openluchtfuif3212.be/

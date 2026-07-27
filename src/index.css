@@ -854,23 +854,10 @@ section { position: relative; padding: 120px 40px; }
   flex: 1;
 }
 
-.ticket-meter {
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(42,15,51,.1);
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.ticket-meter-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--orange);
-  transition: width .6s ease;
-}
-.status-low .ticket-meter-fill,
-.status-soldout .ticket-meter-fill { background: #c23b2b; }
-
+/* The progress bar that used to sit here is gone: its width disclosed roughly
+   how much of a tier was sold. Only the qualitative label remains. */
 .ticket-meter-label {
+  margin-top: 4px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -1282,7 +1269,9 @@ footer {
 .dash-overview { padding: 40px 48px; color: var(--cream); font-family: var(--body); }
 .dash-page { padding: 40px 48px; color: var(--cream); font-family: var(--body); }
 .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.dash-metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 40px; }
+/* auto-fit rather than a fixed 4: the metric row grew to 5 cards when
+   "Verwachte opkomst" was split out from "Tickets verkocht" */
+.dash-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 40px; }
 .dash-feeds-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .dash-mobile-nav   { display: none; }
 

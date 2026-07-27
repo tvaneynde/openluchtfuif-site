@@ -9,12 +9,12 @@ npm run dev       # Start dev server (Vite HMR)
 npm run build     # Production build → dist/
 npm run preview   # Preview production build locally
 npm run lint      # ESLint
-npm run deploy    # Build + publish to GitHub Pages (gh-pages -d dist)
+# Deploy: push to main — Cloudflare Pages builds automatically. There is no deploy script.
 ```
 
 ## Architecture
 
-Single-page React app deployed to GitHub Pages at `https://tvaneynde.github.io/openluchtfuif-site/`.
+Single-page React app deployed to Cloudflare Pages at `https://openluchtfuif3212.be/` (also reachable at `openluchtfuif-site.pages.dev`). It used to live on GitHub Pages under `/openluchtfuif-site/`; that URL still serves a stale build, so ignore it.
 
 **Routing:** `src/main.jsx` wraps everything in a `HashRouter`. Two routes exist:
 - `/` → `App.jsx` (main landing page)
@@ -28,7 +28,7 @@ Single-page React app deployed to GitHub Pages at `https://tvaneynde.github.io/o
 
 **Styling:** All styles live in `src/index.css` — no CSS modules, no Tailwind. CSS custom properties on `:root` define the full design token set (colors, fonts). The design aesthetic is "groovy 70s spray-paint risograph."
 
-**Assets:** Static assets (images, fonts) live in `public/assets/` and are referenced via `import.meta.env.BASE_URL` (e.g. `` `${import.meta.env.BASE_URL}/assets/hero-dancers.png` ``). This is required because Vite is configured with `base: "/openluchtfuif-site"`.
+**Assets:** Static assets (images, fonts) live in `public/assets/` and are referenced via `import.meta.env.BASE_URL` (e.g. `` `${import.meta.env.BASE_URL}/assets/hero-dancers.png` ``). Vite `base` is `"/"` (it was `"/openluchtfuif-site"` before the move to Cloudflare Pages), so `BASE_URL` resolves to `/` — keep using it rather than hardcoding paths.
 
 **Fonts:** Custom display font `Rugrats` loaded via `@font-face` from `public/assets/fonts/Rugrats.otf`. Body font is `Space Grotesk` (loaded from Google Fonts in `index.html`).
 

@@ -7,7 +7,7 @@ const db = createClient(
 
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'tickets@openluchtfuif3212.be'
-const SITE_URL   = Deno.env.get('SITE_URL') ?? 'https://tvaneynde.github.io/openluchtfuif-site'
+const SITE_URL   = Deno.env.get('SITE_URL') ?? 'https://openluchtfuif3212.be'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',

@@ -6,6 +6,7 @@ import OrdersTable from './dashboard/OrdersTable.jsx';
 import EmailLog from './dashboard/EmailLog.jsx';
 import ScannerConfig from './dashboard/ScannerConfig.jsx';
 import PromoCodeManager from './dashboard/PromoCodeManager.jsx';
+import CompTickets from './dashboard/CompTickets.jsx';
 import ContentManager from './dashboard/ContentManager.jsx';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -81,6 +82,14 @@ function TierCard({ tier }) {
   const revenue = tier.sold_count * (tier.price_cents || 0);
   const barColor = pct >= 90 ? '#ff7070' : pct >= 60 ? '#d95a2b' : '#f07a3c';
 
+  // Comp tiers are giveaways, not stock: a full allotment must not read like a
+  // sold-out sale, and their €0 "revenue" is noise.
+  const badge = tier.is_comp
+    ? { bg: 'rgba(180,139,180,0.14)', border: 'rgba(180,139,180,0.45)', color: 'var(--purple-mauve)', label: 'GRATIS' }
+    : tier.is_active
+      ? { bg: 'rgba(80,200,80,0.12)', border: 'rgba(120,220,120,0.4)', color: '#7de87d', label: 'ACTIEF' }
+      : { bg: 'rgba(244,231,208,0.06)', border: 'rgba(244,231,208,0.18)', color: 'rgba(244,231,208,0.4)', label: 'INACTIEF' };
+
   return (
     <div style={{ ...CARD_STYLE, padding: '20px 24px' }}>
       {/* Name + badge */}
@@ -92,12 +101,12 @@ function TierCard({ tier }) {
           display: 'inline-flex', alignItems: 'center', gap: 5,
           padding: '3px 9px', borderRadius: 999,
           fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.14em',
-          background: tier.is_active ? 'rgba(80,200,80,0.12)' : 'rgba(244,231,208,0.06)',
-          border: tier.is_active ? '1px solid rgba(120,220,120,0.4)' : '1px solid rgba(244,231,208,0.18)',
-          color: tier.is_active ? '#7de87d' : 'rgba(244,231,208,0.4)',
+          background: badge.bg,
+          border: `1px solid ${badge.border}`,
+          color: badge.color,
         }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: tier.is_active ? '#7de87d' : 'rgba(244,231,208,0.3)', display: 'inline-block' }} />
-          {tier.is_active ? 'ACTIEF' : 'INACTIEF'}
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: badge.color, display: 'inline-block' }} />
+          {badge.label}
         </span>
       </div>
 
@@ -107,12 +116,12 @@ function TierCard({ tier }) {
           {tier.sold_count}
         </span>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'rgba(244,231,208,0.4)', marginLeft: 6 }}>
-          {tier.is_door_sale ? 'onbeperkt' : `/ ${tier.total_capacity}`}
+          {tier.is_door_sale || tier.is_comp ? 'onbeperkt' : `/ ${tier.total_capacity}`}
         </span>
       </div>
 
-      {/* Progress bar */}
-      {!tier.is_door_sale && (
+      {/* Progress bar — meaningless without a real capacity */}
+      {!tier.is_door_sale && !tier.is_comp && (
         <div style={{ height: 6, borderRadius: 999, background: 'rgba(244,231,208,0.1)', overflow: 'hidden', marginBottom: 12 }}>
           <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 999, transition: 'width 0.5s' }} />
         </div>
@@ -121,11 +130,17 @@ function TierCard({ tier }) {
       {/* Revenue */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ ...MONO, color: 'rgba(244,231,208,0.35)' }}>
-          {tier.is_door_sale ? 'AAN DE DEUR' : `${pct.toFixed(0)}% VERKOCHT`}
+          {tier.is_door_sale
+            ? 'AAN DE DEUR'
+            : tier.is_comp
+              ? 'WEGGEGEVEN'
+              : `${pct.toFixed(0)}% VERKOCHT`}
         </span>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--orange-bright)', letterSpacing: '0.04em' }}>
-          {fmtEuro(revenue)}
-        </span>
+        {!tier.is_comp && (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--orange-bright)', letterSpacing: '0.04em' }}>
+            {fmtEuro(revenue)}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -161,6 +176,7 @@ function Overview() {
   const [tiersData, setTiersData] = useState([]);
   const [totalRevenue, setTotalRevenue] = useState(null);
   const [scannedToday, setScannedToday] = useState(null);
+  const [venueCapacity, setVenueCapacity] = useState(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
 
   const [salesChart, setSalesChart] = useState([]);
@@ -204,7 +220,7 @@ function Overview() {
       // Tiers
       const { data: tiers } = await supabase
         .from('ticket_tiers')
-        .select('id, name, sold_count, total_capacity, price_cents, fee_cents, is_active, is_door_sale')
+        .select('id, name, sold_count, total_capacity, price_cents, fee_cents, is_active, is_door_sale, is_comp')
         .order('sort_order');
 
       if (tiers) {
@@ -214,15 +230,27 @@ function Overview() {
         tierMapRef.current = map;
       }
 
-      // Revenue from paid orders
+      // Revenue from paid orders. order_type='sale' excludes comp (€0 sponsor /
+      // partner) orders — they'd add nothing to the sum but would corrupt any
+      // count-based figure derived from the same query.
       const { data: orders } = await supabase
         .from('orders')
         .select('total_cents')
-        .eq('status', 'paid');
+        .eq('status', 'paid')
+        .eq('order_type', 'sale');
 
       if (orders) {
         setTotalRevenue(orders.reduce((acc, o) => acc + (o.total_cents || 0), 0));
       }
+
+      // Physical venue capacity — an explicit number, not a sum of tier caps
+      const { data: cap } = await supabase
+        .from('config')
+        .select('value')
+        .eq('key', 'venue_capacity')
+        .maybeSingle();
+
+      if (cap?.value != null) setVenueCapacity(Number(cap.value));
 
       // Scanned today
       const todayISO = new Date();
@@ -248,6 +276,7 @@ function Overview() {
         .from('orders')
         .select('paid_at, quantity')
         .eq('status', 'paid')
+        .eq('order_type', 'sale')
         .not('paid_at', 'is', null);
 
       if (data && data.length > 0) {
@@ -279,6 +308,7 @@ function Overview() {
         .from('orders')
         .select('*, ticket_tiers(name)')
         .eq('status', 'paid')
+        .eq('order_type', 'sale')
         .order('paid_at', { ascending: false })
         .limit(10);
       if (data) setOrderFeed(data);
@@ -342,7 +372,7 @@ function Overview() {
     const channel = supabase
       .channel('dashboard-orders')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
-        if (payload.new.status === 'paid') addToOrderFeed(payload.new);
+        if (payload.new.status === 'paid' && payload.new.order_type === 'sale') addToOrderFeed(payload.new);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -360,10 +390,25 @@ function Overview() {
   }, [addToScanFeed]);
 
   // ── derived metrics ──
-  const totalSold = tiersData.reduce((a, t) => a + (t.sold_count || 0), 0);
-  const totalCapacity = tiersData.reduce((a, t) => a + (t.is_door_sale ? 0 : (t.total_capacity || 0)), 0);
-  const pctDoorPoort = totalSold > 0 && scannedToday != null
-    ? ((scannedToday / totalSold) * 100).toFixed(1)
+  // Three distinct numbers, deliberately not two:
+  //   sold      — purchasable tiers only, the figure that pairs with revenue
+  //   comps     — sponsor / partner giveaways, always visible, never hidden
+  //   headcount — sold + comps + door sales, i.e. bodies on the field
+  // Headcount is measured against config.venue_capacity, NOT the sum of tier
+  // capacities: a 40-ticket comp allotment would otherwise silently claim the
+  // field got 40 people bigger.
+  const soldCount = tiersData.reduce(
+    (a, t) => a + (t.is_comp || t.is_door_sale ? 0 : (t.sold_count || 0)), 0);
+  const sellableCapacity = tiersData.reduce(
+    (a, t) => a + (t.is_comp || t.is_door_sale ? 0 : (t.total_capacity || 0)), 0);
+  const compCount = tiersData.reduce((a, t) => a + (t.is_comp ? (t.sold_count || 0) : 0), 0);
+  const doorCount = tiersData.reduce((a, t) => a + (t.is_door_sale ? (t.sold_count || 0) : 0), 0);
+  const headcount = soldCount + compCount + doorCount;
+
+  // Scans include comp tickets, so the denominator must too — comps walk through
+  // the same gate as everyone else.
+  const pctDoorPoort = headcount > 0 && scannedToday != null
+    ? ((scannedToday / headcount) * 100).toFixed(1)
     : null;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -396,13 +441,19 @@ function Overview() {
       <div className="dash-metrics-grid">
         <MetricCard
           label="Tickets verkocht"
-          value={`${totalSold} / ${totalCapacity}`}
-          sub={totalCapacity > 0 ? `${((totalSold / totalCapacity) * 100).toFixed(1)}% BEZETTING` : undefined}
+          value={`${soldCount} / ${sellableCapacity}`}
+          sub={sellableCapacity > 0 ? `${((soldCount / sellableCapacity) * 100).toFixed(1)}% VERKOCHT` : undefined}
           loading={metricsLoading}
         />
         <MetricCard
           label="Omzet"
           value={totalRevenue != null ? fmtEuro(totalRevenue) : '—'}
+          loading={metricsLoading}
+        />
+        <MetricCard
+          label="Verwachte opkomst"
+          value={venueCapacity ? `${headcount} / ${venueCapacity}` : headcount}
+          sub={compCount > 0 ? `INCL. ${compCount} GRATIS` : 'VERKOCHT + GRATIS + DEUR'}
           loading={metricsLoading}
         />
         <MetricCard
@@ -413,7 +464,7 @@ function Overview() {
         <MetricCard
           label="% Door poort"
           value={pctDoorPoort != null ? `${pctDoorPoort}%` : '—'}
-          sub={scannedToday != null && totalSold > 0 ? `${scannedToday} VAN ${totalSold}` : undefined}
+          sub={scannedToday != null && headcount > 0 ? `${scannedToday} VAN ${headcount}` : undefined}
           loading={metricsLoading}
         />
       </div>
@@ -1031,6 +1082,7 @@ function Sidebar({ onSignOut }) {
         <NavItem to="/dashboard/emails" label="E-mails" icon="✉" />
         <NavItem to="/dashboard/scanner" label="Scanner" icon="◎" />
         <NavItem to="/dashboard/promo" label="Promo codes" icon="%" />
+        <NavItem to="/dashboard/gratis" label="Gratis tickets" icon="◇" />
         <NavItem to="/dashboard/content" label="Content" icon="✎" />
       </nav>
 
@@ -1184,6 +1236,7 @@ export default function Dashboard() {
             <Route path="emails" element={<EmailLog />} />
             <Route path="scanner" element={<ScannerConfig />} />
             <Route path="promo" element={<PromoCodeManager />} />
+            <Route path="gratis" element={<CompTickets />} />
             <Route path="content" element={<ContentManager />} />
           </Routes>
         </main>

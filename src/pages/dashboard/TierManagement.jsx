@@ -471,18 +471,32 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
             <h3 style={s.tierName}>{tier.name}</h3>
-            <button
-              style={s.badge(tier.is_active)}
-              onClick={() => onToggleActive(tier)}
-              title={tier.is_active ? 'Klik om te deactiveren' : 'Klik om te activeren'}
-            >
+            {/* Comp tiers must never go public — no toggle, just a static label.
+                One misclick here would put a €0 tier on the checkout page.
+                (RLS also blocks it, this keeps the UI honest.) */}
+            {tier.is_comp ? (
               <span style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: tier.is_active ? '#7de87d' : 'rgba(244,231,208,0.3)',
-                display: 'inline-block',
-              }} />
-              {tier.is_active ? 'ACTIEF' : 'INACTIEF'}
-            </button>
+                ...s.mono, fontSize: 10, letterSpacing: '0.12em',
+                padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(180,139,180,0.14)', color: 'var(--purple-mauve)',
+                border: '1px solid rgba(180,139,180,0.45)',
+              }}>
+                GRATIS · NIET TE KOOP · ONBEPERKT
+              </span>
+            ) : (
+              <button
+                style={s.badge(tier.is_active)}
+                onClick={() => onToggleActive(tier)}
+                title={tier.is_active ? 'Klik om te deactiveren' : 'Klik om te activeren'}
+              >
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: tier.is_active ? '#7de87d' : 'rgba(244,231,208,0.3)',
+                  display: 'inline-block',
+                }} />
+                {tier.is_active ? 'ACTIEF' : 'INACTIEF'}
+              </button>
+            )}
             {tier.is_door_sale && (
               <span style={{
                 ...s.mono, fontSize: 10, letterSpacing: '0.12em',
@@ -504,19 +518,31 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
       </div>
 
       <div style={s.statsRow}>
-        <div style={s.stat}>
-          <div style={s.statLabel}>Prijs</div>
-          <div style={s.statValue}>{fmtEuro(tier.price_cents)}</div>
-        </div>
-        <div style={s.stat}>
-          <div style={s.statLabel}>Service fee</div>
-          <div style={s.statValue}>{fmtEuro(tier.fee_cents)}</div>
-        </div>
-        <div style={s.stat}>
-          <div style={s.statLabel}>Totaal</div>
-          <div style={s.statValue}>{fmtEuro(tier.price_cents + tier.fee_cents)}</div>
-        </div>
-        {!tier.is_door_sale && (
+        {/* Price columns are meaningless for a giveaway tier */}
+        {!tier.is_comp && (
+          <>
+            <div style={s.stat}>
+              <div style={s.statLabel}>Prijs</div>
+              <div style={s.statValue}>{fmtEuro(tier.price_cents)}</div>
+            </div>
+            <div style={s.stat}>
+              <div style={s.statLabel}>Service fee</div>
+              <div style={s.statValue}>{fmtEuro(tier.fee_cents)}</div>
+            </div>
+            <div style={s.stat}>
+              <div style={s.statLabel}>Totaal</div>
+              <div style={s.statValue}>{fmtEuro(tier.price_cents + tier.fee_cents)}</div>
+            </div>
+          </>
+        )}
+        {/* Comps have no allotment — only a running total */}
+        {tier.is_comp && (
+          <div style={s.stat}>
+            <div style={s.statLabel}>Weggegeven</div>
+            <div style={s.statValue}>{tier.sold_count}</div>
+          </div>
+        )}
+        {!tier.is_door_sale && !tier.is_comp && (
           <>
             <div style={s.stat}>
               <div style={s.statLabel}>Capaciteit</div>
@@ -532,7 +558,7 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
         )}
       </div>
 
-      {!tier.is_door_sale && <ProgressBar sold={tier.sold_count} total={tier.total_capacity} />}
+      {!tier.is_door_sale && !tier.is_comp && <ProgressBar sold={tier.sold_count} total={tier.total_capacity} />}
 
       {(tier.sale_starts_at || tier.sale_ends_at) && (
         <div style={{ marginTop: 12, display: 'flex', gap: 24, opacity: 0.5 }}>
@@ -747,11 +773,16 @@ export default function TierManagement() {
           borderRadius: 12, padding: '16px 24px',
         }}>
           {[
+            // Capaciteit / Verkocht / Beschikbaar mean *purchasable* stock, so
+            // comp tiers are excluded the same way door sales already are —
+            // otherwise an unissued sponsor allotment reads as available stock.
+            // Comps get their own column instead of being hidden.
             { label: 'Tiers', val: tiers.length },
             { label: 'Actief', val: tiers.filter(t => t.is_active).length },
-            { label: 'Totale capaciteit', val: tiers.reduce((a, t) => a + (t.is_door_sale ? 0 : t.total_capacity), 0) },
-            { label: 'Totaal verkocht', val: tiers.reduce((a, t) => a + t.sold_count, 0) },
-            { label: 'Beschikbaar', val: tiers.reduce((a, t) => a + (t.is_door_sale ? 0 : (t.total_capacity - t.sold_count)), 0) },
+            { label: 'Totale capaciteit', val: tiers.reduce((a, t) => a + (t.is_door_sale || t.is_comp ? 0 : t.total_capacity), 0) },
+            { label: 'Totaal verkocht', val: tiers.reduce((a, t) => a + (t.is_comp ? 0 : t.sold_count), 0) },
+            { label: 'Beschikbaar', val: tiers.reduce((a, t) => a + (t.is_door_sale || t.is_comp ? 0 : (t.total_capacity - t.sold_count)), 0) },
+            { label: 'Gratis uitgegeven', val: tiers.reduce((a, t) => a + (t.is_comp ? t.sold_count : 0), 0) },
           ].map(({ label, val }) => (
             <div key={label} style={{ paddingRight: 20, borderRight: '1px solid rgba(244,231,208,0.08)', lastChild: { border: 'none' } }}>
               <div style={{ ...s.mono, fontSize: 9, opacity: 0.45, marginBottom: 4 }}>{label.toUpperCase()}</div>

@@ -48,17 +48,37 @@ export async function lookupToken(scanToken) {
   })
 }
 
-/** Mark a token as scanned in the local cache */
-export async function markScannedLocally(scanToken) {
-  const db     = await openDb()
-  const tx     = db.transaction(TOKENS_STORE, 'readwrite')
-  const store  = tx.objectStore(TOKENS_STORE)
-  const existing = await new Promise(r => {
-    const req = store.get(scanToken); req.onsuccess = () => r(req.result)
-  })
-  if (existing) {
-    store.put({ ...existing, status: 'scanned', scanned_at: new Date().toISOString() })
+/**
+ * Mark a token as scanned in the local cache.
+ *
+ * Upserts rather than only updating: a ticket issued after this device's last
+ * cache refresh (a freshly generated comp ticket, say) isn't in the store yet,
+ * and the old `if (existing)` guard made this a silent no-op for exactly those
+ * tickets. They then stayed uncached forever, so a second scan looked like an
+ * unknown token instead of a duplicate.
+ *
+ * `info` carries whatever the server told us, so the cached row can still show
+ * a name and tier on the repeat scan.
+ */
+export async function markScannedLocally(scanToken, info = {}) {
+  // Read and write in SEPARATE transactions. Awaiting a promise between get()
+  // and put() on one transaction lets IndexedDB auto-commit it first, so the
+  // put lands on a closed transaction and is silently dropped — which made this
+  // function nondeterministic.
+  const existing = await lookupToken(scanToken)
+
+  const record = {
+    ...(existing ?? { scan_token: scanToken, buyer_name: '', tier_name: '', ticket_number: '' }),
+    ...info,
+    scan_token: scanToken,
+    status: 'scanned',
+    scanned_at: new Date().toISOString(),
   }
+
+  const db    = await openDb()
+  const tx    = db.transaction(TOKENS_STORE, 'readwrite')
+  tx.objectStore(TOKENS_STORE).put(record)
+  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej })
 }
 
 /** Get total number of cached tokens */

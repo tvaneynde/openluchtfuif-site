@@ -526,7 +526,20 @@ function ResultOverlay({ result }) {
     )
   }
 
-  // invalid / cancelled / unknown
+  // A cancelled ticket is a real ticket that was refunded or revoked — telling
+  // door staff that, rather than "Ongeldig", saves an argument at the gate.
+  if (result.type === 'cancelled') {
+    return (
+      <div style={S.resultOverlay('rgba(200,30,30,0.95)')}>
+        <div style={S.resultIcon}>✗</div>
+        <p style={S.resultName}>Ingetrokken</p>
+        <p style={S.resultMono}>Terugbetaald of geannuleerd</p>
+        {result.ticketNumber && <p style={S.resultSmall}>#{result.ticketNumber}</p>}
+      </div>
+    )
+  }
+
+  // invalid / unknown
   return (
     <div style={S.resultOverlay('rgba(200,30,30,0.95)')}>
       <div style={S.resultIcon}>✗</div>
@@ -702,26 +715,49 @@ function CameraView({ session, onLogout }) {
           queueScan({ token, scanner_id: session.deviceId, queued_at: new Date().toISOString() })
         }
       }
-    } else {
-      // Token not in local cache — show invalid immediately
-      showResult({ type: 'invalid' })
+    } else if (navigator.onLine) {
+      // Not in the local cache, but we're online — ask the server and show ITS
+      // verdict. Deliberately no optimistic red flash first: the cache misses
+      // for any ticket issued since the last refresh, and flashing "Ongeldig"
+      // at the gate before correcting it gets people turned away.
+      const serverResult = await syncWithServer(token)
 
-      // Background server check (handles stale cache edge case)
-      if (navigator.onLine) {
-        syncWithServer(token).then(serverResult => {
-          if (serverResult?.result === 'valid') {
-            // Cache was stale — ticket is actually valid
-            markScannedLocally(token)
-            refreshStats()
-            showResult({
-              type: 'valid',
-              name: serverResult.buyer_name,
-              tier: serverResult.tier_name,
-              ticketNumber: serverResult.ticket_number,
-            })
-          }
-        }).catch(() => {})
+      if (serverResult?.result === 'valid') {
+        const info = {
+          buyer_name:    serverResult.buyer_name ?? '',
+          tier_name:     serverResult.tier_name ?? '',
+          ticket_number: serverResult.ticket_number ?? '',
+        }
+        // Cache it so a repeat scan on this device is recognised as a duplicate
+        // instead of falling into this branch again.
+        await markScannedLocally(token, info)
+        setCachedCount(await getCachedCount())
+        refreshStats()
+        showResult({
+          type: 'valid',
+          name: info.buyer_name,
+          tier: info.tier_name,
+          ticketNumber: info.ticket_number,
+        })
+      } else if (serverResult?.result === 'already_scanned') {
+        // This was the bug: only 'valid' used to be handled, so a duplicate scan
+        // of an uncached ticket reported "Ongeldig" instead of "Al gescand".
+        await markScannedLocally(token, { ticket_number: serverResult.ticket_number ?? '' })
+        setCachedCount(await getCachedCount())
+        showResult({
+          type: 'already_scanned',
+          scannedAt: serverResult.scanned_at,
+          scannedBy: serverResult.scanned_by,
+        })
+      } else if (serverResult?.result === 'cancelled') {
+        // Refunded order, or a revoked sponsor/partner ticket
+        showResult({ type: 'cancelled', ticketNumber: serverResult.ticket_number })
+      } else {
+        showResult({ type: 'invalid' })
       }
+    } else {
+      // Offline and unknown to this device — nothing better we can say
+      showResult({ type: 'invalid' })
     }
   }, [session, syncWithServer, showResult, refreshStats])
 

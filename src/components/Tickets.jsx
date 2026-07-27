@@ -6,13 +6,14 @@ function formatPrice(cents) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace('.', ',');
 }
 
+// Reads booleans from the public_ticket_tiers view — the remaining count is not
+// sent to the browser on purpose, so scarcity is qualitative only.
 function tierStatus(tier) {
   const now = new Date();
-  const remaining = tier.total_capacity - (tier.sold_count ?? 0);
   if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) return 'soon';
   if (tier.sale_ends_at && new Date(tier.sale_ends_at) < now) return 'closed';
-  if (remaining <= 0) return 'soldout';
-  if (remaining <= 20) return 'low';
+  if (!tier.is_door_sale && tier.is_sold_out) return 'soldout';
+  if (!tier.is_door_sale && tier.is_almost_sold_out) return 'low';
   return 'open';
 }
 
@@ -27,17 +28,9 @@ const STATUS_LABEL = {
 const ROTATIONS = [-1.6, 1.1, -0.7, 1.4];
 
 function TicketStub({ tier, index }) {
-  const sold = tier.sold_count ?? 0;
-  const remaining = Math.max(0, tier.total_capacity - sold);
-  const pctSold = Math.min(100, Math.round((sold / tier.total_capacity) * 100));
   const status = tierStatus(tier);
   const disabled = status === 'soldout' || status === 'soon' || status === 'closed';
-
-  const meterLabel = status === 'low'
-    ? `Nog maar ${remaining} over`
-    : status === 'soldout'
-      ? 'Geen tickets meer'
-      : STATUS_LABEL[status];
+  const statusLabel = STATUS_LABEL[status];
 
   return (
     <div
@@ -57,11 +50,9 @@ function TicketStub({ tier, index }) {
           {tier.description || 'Toegang tot de volledige avond.'}
         </p>
 
-        <div className="ticket-meter">
-          <div className="ticket-meter-fill" style={{ width: `${pctSold}%` }} />
-        </div>
+        {/* No meter bar: its width would give the ratio sold away */}
         <div className="ticket-meter-label mono">
-          <span className={status === 'low' || status === 'soldout' ? 'urgent' : ''}>{meterLabel}</span>
+          <span className={status === 'low' || status === 'soldout' ? 'urgent' : ''}>{statusLabel}</span>
         </div>
       </div>
 
@@ -139,9 +130,8 @@ export default function Tickets({ mode = 'live' }) {
   useEffect(() => {
     if (mode !== 'live' || !supabase) { setLoading(false); return; }
     supabase
-      .from('ticket_tiers')
+      .from('public_ticket_tiers')
       .select('*')
-      .eq('is_active', true)
       .order('sort_order')
       .then(({ data }) => {
         if (data) setTiers(data);

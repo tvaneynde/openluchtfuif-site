@@ -138,7 +138,19 @@ const s = {
   },
 };
 
-const SCANNER_URL = 'https://tvaneynde.github.io/openluchtfuif-site/#/scanner';
+// Derived from the current origin rather than hardcoded: this QR code gets
+// printed and handed to volunteers, and a stale URL here is invisible until
+// someone scans it at the gate. (It was still pointing at the old GitHub Pages
+// host long after the move to Cloudflare Pages.)
+// Falls back to the canonical domain when generating from a dev server, so a QR
+// printed off localhost still works.
+const CANONICAL_ORIGIN = 'https://openluchtfuif3212.be';
+
+const SCANNER_URL = (() => {
+  const { origin, hostname } = window.location;
+  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
+  return `${isLocal ? CANONICAL_ORIGIN : origin}/#/scanner`;
+})();
 
 // ─── Section 1: PIN management ───────────────────────────────────────────────
 

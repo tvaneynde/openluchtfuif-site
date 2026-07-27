@@ -25,9 +25,10 @@ export default function Checkout() {
 
     if (!supabase) { setLoading(false); return; }
     supabase
-      .from('ticket_tiers')
+      // public_ticket_tiers deliberately omits sold_count/total_capacity —
+      // scarcity arrives as booleans so the remaining count is never disclosed.
+      .from('public_ticket_tiers')
       .select('*')
-      .eq('is_active', true)
       .eq('is_door_sale', false)
       .order('sort_order')
       .then(({ data }) => {
@@ -425,8 +426,7 @@ export default function Checkout() {
             ) : (
               tiers.map((tier) => {
                 const active = selectedTier?.id === tier.id;
-                const remaining = tier.total_capacity - (tier.sold_count ?? 0);
-                const low = remaining <= 20;
+                const low = !!tier.is_almost_sold_out;
                 return (
                   <div
                     key={tier.id}
@@ -440,9 +440,10 @@ export default function Checkout() {
                     <div>
                       <div style={s.tierName}>{tier.name}</div>
                       <div style={s.tierFee}>+ {formatCents(tier.fee_cents)} transactiekosten</div>
-                      {tier.total_capacity != null && (
+                      {/* Scarcity nudge only — never a count */}
+                      {(low || tier.is_sold_out) && (
                         <div style={s.capacityBadge(low)}>
-                          {low ? `Nog ${remaining} beschikbaar` : `${remaining} beschikbaar`}
+                          {tier.is_sold_out ? 'Uitverkocht' : 'Bijna vol'}
                         </div>
                       )}
                     </div>

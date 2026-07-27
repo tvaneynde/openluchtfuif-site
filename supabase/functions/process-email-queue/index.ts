@@ -16,7 +16,13 @@ const LOGO_URL    = 'https://noihnuouftyvsvzybwer.supabase.co/storage/v1/object/
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey',
+  // x-client-info and x-supabase-api-version are attached automatically by
+  // supabase-js on functions.invoke(). Leaving them out of the preflight makes
+  // every browser call fail as a CORS error before it reaches this function —
+  // which is why the free-ticket mail and the dashboard's "Verstuur opnieuw"
+  // buttons did nothing. This is the only function the frontend reaches via
+  // functions.invoke; the others use plain fetch with explicit headers.
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info, x-supabase-api-version',
 }
 
 // ─────────────────────────────────────────────────────────────

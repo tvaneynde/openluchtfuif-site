@@ -4,7 +4,9 @@ import { supabase } from '../../utils/supabase';
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 function exportCSV(orders) {
-  const headers = ['Naam', 'Email', 'Tier', 'Aantal', 'Bedrag', 'Status', 'Datum', 'Order ID'];
+  // Comp rows stay in the export — the sponsor/partner reconciliation needs
+  // them — but they're labelled so €0.00 never reads as a free sale.
+  const headers = ['Naam', 'Email', 'Tier', 'Aantal', 'Bedrag', 'Status', 'Type', 'Reden', 'Notitie', 'Datum', 'Order ID'];
   const rows = orders
     .filter(o => o.status === 'paid')
     .map(o => [
@@ -14,6 +16,9 @@ function exportCSV(orders) {
       o.quantity,
       (o.total_cents / 100).toFixed(2),
       o.status,
+      o.order_type === 'comp' ? 'gratis' : 'verkoop',
+      o.comp_reason ?? '',
+      o.comp_note ?? '',
       o.paid_at ? new Date(o.paid_at).toLocaleDateString('nl-BE') : '',
       o.id,
     ]);
@@ -41,6 +46,13 @@ const STATUS_CONFIG = {
   cancelled: { label: 'GEANNUL.',   bg: 'rgba(220,60,60,0.12)',    border: 'rgba(220,60,60,0.3)',    color: '#ff7070' },
   failed:    { label: 'MISLUKT',    bg: 'rgba(220,60,60,0.12)',    border: 'rgba(220,60,60,0.3)',    color: '#ff7070' },
   refunded:  { label: 'TERUGBET.',  bg: 'rgba(160,80,220,0.12)',   border: 'rgba(160,80,220,0.35)', color: '#c07aff' },
+};
+
+export const COMP_REASON_LABEL = {
+  sponsor:      'Sponsor',
+  partner_swap: 'Partnerruil',
+  crew:         'Crew',
+  other:        'Andere',
 };
 
 function StatusBadge({ status }) {
@@ -421,6 +433,7 @@ export default function OrdersTable() {
 
   const [searchEmail, setSearchEmail] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(0);
 
   const [expandedOrderId, setExpandedOrderId] = useState(null);
@@ -442,7 +455,12 @@ export default function OrdersTable() {
   }, []);
 
   // ── computed totals (always from full paid set) ──
-  const paidOrders = useMemo(() => orders.filter(o => o.status === 'paid'), [orders]);
+  // Comp orders (sponsor / partner giveaways) are paid rows worth €0. Counting
+  // them here would silently drag "Gem. orderwaarde" down below the real ticket
+  // price, so every sales figure is scoped to order_type='sale'.
+  const paidOrders = useMemo(
+    () => orders.filter(o => o.status === 'paid' && o.order_type === 'sale'), [orders]);
+  const compOrders = useMemo(() => orders.filter(o => o.order_type === 'comp'), [orders]);
   const totalRevenue = useMemo(() => paidOrders.reduce((a, o) => a + (o.total_cents || 0), 0), [paidOrders]);
 
   // ── filters + pagination ──
@@ -458,14 +476,17 @@ export default function OrdersTable() {
     if (statusFilter) {
       list = list.filter(o => o.status === statusFilter);
     }
+    if (typeFilter) {
+      list = list.filter(o => (o.order_type ?? 'sale') === typeFilter);
+    }
     return list;
-  }, [orders, searchEmail, statusFilter]);
+  }, [orders, searchEmail, statusFilter, typeFilter]);
 
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // reset to page 0 on filter change
-  useEffect(() => { setPage(0); }, [searchEmail, statusFilter]);
+  useEffect(() => { setPage(0); }, [searchEmail, statusFilter, typeFilter]);
 
   // ── toggle expand ──
   function toggleExpand(orderId) {
@@ -511,10 +532,11 @@ export default function OrdersTable() {
             { label: 'Betaalde orders', val: paidOrders.length },
             { label: 'Totale omzet', val: fmtEuro(totalRevenue), highlight: true },
             { label: 'Gem. orderwaarde', val: paidOrders.length > 0 ? fmtEuro(Math.round(totalRevenue / paidOrders.length)) : '—' },
+            { label: 'Gratis tickets', val: compOrders.filter(o => o.status === 'paid').reduce((a, o) => a + (o.quantity || 0), 0) },
             { label: 'Openstaand', val: orders.filter(o => o.status === 'pending').length },
             { label: 'Verlopen / Annul.', val: orders.filter(o => o.status === 'expired' || o.status === 'cancelled').length },
-          ].map(({ label, val, highlight }, i) => (
-            <div key={label} style={{ ...s.summaryItem, ...(i === 4 ? { borderRight: 'none' } : {}) }}>
+          ].map(({ label, val, highlight }, i, arr) => (
+            <div key={label} style={{ ...s.summaryItem, ...(i === arr.length - 1 ? { borderRight: 'none' } : {}) }}>
               <div style={s.summaryLabel}>{label}</div>
               <div style={{ ...s.summaryValue, color: highlight ? 'var(--orange-bright)' : 'var(--cream)' }}>{val}</div>
             </div>
@@ -543,17 +565,26 @@ export default function OrdersTable() {
           <option value="cancelled">Geannuleerd</option>
           <option value="failed">Mislukt</option>
         </select>
-        {(searchEmail || statusFilter) && (
+        <select
+          style={s.selectInput}
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+        >
+          <option value="">Alle types</option>
+          <option value="sale">Verkoop</option>
+          <option value="comp">Gratis</option>
+        </select>
+        {(searchEmail || statusFilter || typeFilter) && (
           <button
             style={{ ...s.btnPage, fontSize: 10 }}
-            onClick={() => { setSearchEmail(''); setStatusFilter(''); }}
+            onClick={() => { setSearchEmail(''); setStatusFilter(''); setTypeFilter(''); }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(244,231,208,0.14)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,231,208,0.07)'}
           >
             Wis filters
           </button>
         )}
-        {(searchEmail || statusFilter) && (
+        {(searchEmail || statusFilter || typeFilter) && (
           <span style={{ ...s.mono, fontSize: 10, opacity: 0.45, alignSelf: 'center' }}>
             {filtered.length} resultaten
           </span>
@@ -610,7 +641,25 @@ export default function OrdersTable() {
                       {fmtEuro(order.total_cents)}
                     </td>
                     <td style={s.td}>
-                      <StatusBadge status={order.status} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <StatusBadge status={order.status} />
+                        {order.order_type === 'comp' && (
+                          <span
+                            title={[COMP_REASON_LABEL[order.comp_reason] ?? order.comp_reason, order.comp_note]
+                              .filter(Boolean).join(' — ')}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center',
+                              padding: '2px 7px', borderRadius: 999,
+                              fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.12em',
+                              background: 'rgba(180,139,180,0.14)',
+                              border: '1px solid rgba(180,139,180,0.45)',
+                              color: 'var(--purple-mauve)', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            GRATIS
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ ...s.td, textAlign: 'right' }}>
                       <button

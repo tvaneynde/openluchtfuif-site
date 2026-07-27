@@ -6,7 +6,7 @@ const db = createClient(
 )
 
 const MOLLIE_KEY = Deno.env.get('MOLLIE_API_KEY')!
-const SITE_URL   = Deno.env.get('SITE_URL') ?? 'https://tvaneynde.github.io/openluchtfuif-site'
+const SITE_URL   = Deno.env.get('SITE_URL') ?? 'https://openluchtfuif3212.be'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -83,14 +83,22 @@ Deno.serve(async (req) => {
 
   if (!tier) return err('Ticket tier not found or inactive', 404)
   if (tier.is_door_sale) return err('This tier is only available at the door', 400)
+  // Comp tiers are €0 giveaways for sponsors/partners. They are never purchasable —
+  // don't rely on is_active being false, that's one dashboard misclick away.
+  if (tier.is_comp) return err('This tier cannot be purchased', 400)
 
   const now = new Date()
   if (tier.sale_starts_at && new Date(tier.sale_starts_at) > now) return err('Tickets are not on sale yet')
   if (tier.sale_ends_at   && new Date(tier.sale_ends_at)   < now) return err('Ticket sales have ended')
 
+  // Deliberately does not report the remaining count — the public site no longer
+  // discloses it (see the public_ticket_tiers view), and an error message would
+  // be a trivial way to read it back out.
   const remaining = tier.total_capacity - tier.sold_count
   if (remaining < quantity) {
-    return err(remaining === 0 ? 'Uitverkocht' : `Nog maar ${remaining} ticket(s) beschikbaar`)
+    return err(remaining === 0
+      ? 'Uitverkocht'
+      : 'Niet genoeg tickets beschikbaar — probeer een kleiner aantal')
   }
 
   // ── Validate promo code if provided ──────────────────────────
@@ -128,10 +136,14 @@ Deno.serve(async (req) => {
   // Look up ANY order with this idempotency key, not just pending/awaiting_payment —
   // mollie_idempotency_key is UNIQUE, so a cancelled/expired row with the same key
   // must be reused (updated) rather than re-inserted, or the insert below fails.
+  // Scoped to order_type='sale': comp orders live in the same table, and the
+  // reuse branch below happily adopts a cancelled/expired row without resetting
+  // order_type — a revoked comp order must never be recycled into a Mollie sale.
   const { data: existingOrder } = await db
     .from('orders')
     .select('id, mollie_payment_id, status')
     .eq('mollie_idempotency_key', iKey)
+    .eq('order_type', 'sale')
     .maybeSingle()
 
   if (existingOrder?.mollie_payment_id && existingOrder.status === 'awaiting_payment') {
@@ -193,26 +205,14 @@ Deno.serve(async (req) => {
     orderId = order.id
   }
 
-  // ── Handle free orders (100% discount) ───────────────────────
+  // ── Never mint a free ticket from the public endpoint ─────────
+  // This function runs with verify_jwt=false, so a €0 total used to mean
+  // "skip Mollie, mark paid, issue tickets" to anyone who could reach a
+  // 100%-discount code. Free tickets now come only from issue_comp_tickets(),
+  // which requires an authenticated admin.
   if (totalCents === 0) {
-    // Mark order as paid directly, skip Mollie
-    await db.from('orders').update({
-      status: 'paid',
-      paid_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', orderId)
-
-    // Confirm payment (generate tickets etc.)
-    await db.rpc('confirm_payment', { p_order_id: orderId })
-
-    // Increment promo usage
-    if (validatedPromoCode && promoData) {
-      await db.from('promo_codes')
-        .update({ used_count: promoData.used_count + 1 })
-        .eq('code', validatedPromoCode)
-    }
-
-    return json({ orderId, free: true })
+    console.error('Rejected €0 order', { orderId, tier_id, promo: validatedPromoCode })
+    return err('Ongeldig ordertotaal', 400)
   }
 
   // ── Create Mollie payment ─────────────────────────────────────
