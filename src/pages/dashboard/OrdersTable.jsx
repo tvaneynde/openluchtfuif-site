@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../utils/supabase';
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────
@@ -274,6 +274,216 @@ const s = {
   },
 };
 
+// Shared by the initial load and the post-reconcile refetch. Kept free of any
+// setState so the mount effect can call it without triggering cascading renders.
+function fetchOrders() {
+  return supabase
+    .from('orders')
+    .select('*, ticket_tiers(name)')
+    .order('created_at', { ascending: false });
+}
+
+// ─── ReconcilePanel ───────────────────────────────────────────────────────────
+//
+// Recovers orders that were paid at Mollie but never confirmed here (the
+// mollie-webhook 401 outage, 2026-07-27 → 08-02). Mollie is the source of
+// truth: the edge function asks Mollie about every unconfirmed order and only
+// offers to confirm the ones Mollie reports as actually paid.
+//
+// Deliberately two-phase. Applying mints real tickets and emails real
+// customers, so the first click only ever reports — nothing irreversible
+// happens until the operator has seen the list and clicked the second button.
+
+const ACTION_CONFIG = {
+  would_confirm:  { label: 'BETAALD — TE BEVESTIGEN', color: '#7de87d' },
+  confirmed:      { label: 'BEVESTIGD ✓',             color: '#7de87d' },
+  already_paid:   { label: 'AL BEVESTIGD',            color: 'rgba(244,231,208,0.45)' },
+  skip_unpaid:    { label: 'NIET BETAALD',            color: 'rgba(244,231,208,0.45)' },
+  lookup_failed:  { label: 'MOLLIE ONBEREIKBAAR',     color: '#ff8080' },
+  confirm_failed: { label: 'MISLUKT',                 color: '#ff8080' },
+};
+
+function ReconcilePanel({ onClose, onApplied }) {
+  const [phase, setPhase] = useState('loading'); // loading | review | applying | done
+  const [data,  setData]  = useState(null);
+  const [error, setError] = useState(null);
+
+  async function call(dryRun) {
+    const { data: res, error: err } = await supabase.functions.invoke('reconcile-payments', {
+      body: { dry_run: dryRun },
+    });
+    if (err) throw new Error(err.message || String(err));
+    if (res?.error) throw new Error(res.error);
+    return res;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await call(true);
+        if (!cancelled) { setData(res); setPhase('review'); }
+      } catch (e) {
+        if (!cancelled) { setError(e.message); setPhase('review'); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleApply() {
+    setPhase('applying');
+    setError(null);
+    try {
+      const res = await call(false);
+      setData(res);
+      setPhase('done');
+      if (onApplied) onApplied();
+    } catch (e) {
+      setError(e.message);
+      setPhase('review');
+    }
+  }
+
+  const pending = data?.results?.filter(r => r.action === 'would_confirm') ?? [];
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.03)',
+      border: '1px solid rgba(244,231,208,0.12)',
+      borderRadius: 14,
+      padding: '20px 24px',
+      marginBottom: 24,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ ...s.mono, fontSize: 9, opacity: 0.45, letterSpacing: '0.18em', marginBottom: 4 }}>
+            BETALINGSCONTROLE
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.65 }}>
+            Vergelijkt elke onbevestigde bestelling met de echte status bij Mollie.
+          </div>
+        </div>
+        <button
+          style={{ ...s.btnSmall }}
+          onClick={onClose}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(244,231,208,0.14)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(244,231,208,0.07)'}
+        >
+          Sluiten
+        </button>
+      </div>
+
+      {phase === 'loading' && (
+        <div style={{ ...s.mono, fontSize: 11, opacity: 0.5, padding: '20px 0' }}>
+          Status opvragen bij Mollie…
+        </div>
+      )}
+
+      {phase === 'applying' && (
+        <div style={{ ...s.mono, fontSize: 11, color: 'var(--orange-bright)', padding: '20px 0' }}>
+          Bevestigen en tickets versturen…
+        </div>
+      )}
+
+      {error && (
+        <div style={{ ...s.errorBanner, marginBottom: 14 }}>Fout: {error}</div>
+      )}
+
+      {data?.results?.length === 0 && (
+        <div style={{ ...s.mono, fontSize: 11, opacity: 0.5, padding: '16px 0' }}>
+          Geen onbevestigde bestellingen — alles staat gelijk met Mollie.
+        </div>
+      )}
+
+      {data?.results?.length > 0 && (
+        <>
+          <table style={{ ...s.table, marginBottom: 16 }}>
+            <thead>
+              <tr>
+                {['Datum', 'Naam', 'Bedrag', 'Bij ons', 'Bij Mollie', 'Resultaat'].map(h => (
+                  <th key={h} style={s.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.results.map(r => {
+                const cfg = ACTION_CONFIG[r.action] ?? { label: r.action.toUpperCase(), color: 'rgba(244,231,208,0.5)' };
+                return (
+                  <tr key={r.order_id}>
+                    <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, whiteSpace: 'nowrap' }}>
+                      {fmtDate(r.created_at)}
+                    </td>
+                    <td style={{ ...s.td, fontSize: 12 }}>
+                      {r.buyer_name}
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 10, opacity: 0.4 }}>{r.buyer_email}</div>
+                    </td>
+                    <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {fmtEuro(r.total_cents)}
+                      <span style={{ opacity: 0.4 }}> × {r.quantity}</span>
+                    </td>
+                    <td style={s.td}><StatusBadge status={r.our_status} /></td>
+                    <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.75 }}>
+                      {r.mollie_status ?? '—'}
+                    </td>
+                    <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: 9, letterSpacing: '0.12em', color: cfg.color }}>
+                      {cfg.label}
+                      {r.tickets_issued > 0 && ` (${r.tickets_issued})`}
+                      {r.error && <div style={{ opacity: 0.7, marginTop: 3 }}>{r.error}</div>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {phase === 'review' && pending.length > 0 && (
+            <div style={{
+              borderTop: '1px solid rgba(244,231,208,0.1)',
+              paddingTop: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              flexWrap: 'wrap',
+            }}>
+              <button
+                style={{
+                  ...s.btnPage,
+                  background: 'var(--orange)',
+                  color: '#1a0a00',
+                  border: 'none',
+                  fontWeight: 700,
+                  padding: '10px 20px',
+                }}
+                onClick={handleApply}
+              >
+                Bevestig {pending.length} bestelling{pending.length === 1 ? '' : 'en'} en verstuur tickets
+              </button>
+              <span style={{ fontSize: 12, opacity: 0.55, maxWidth: 420, lineHeight: 1.5 }}>
+                Dit maakt de tickets aan en stuurt ze per e-mail naar deze klanten. Niet omkeerbaar.
+              </span>
+            </div>
+          )}
+
+          {phase === 'review' && pending.length === 0 && !error && (
+            <div style={{ ...s.mono, fontSize: 11, opacity: 0.5, borderTop: '1px solid rgba(244,231,208,0.1)', paddingTop: 16 }}>
+              Niets te bevestigen — geen van deze bestellingen is bij Mollie als betaald geregistreerd.
+            </div>
+          )}
+
+          {phase === 'done' && (
+            <div style={{
+              ...s.mono, fontSize: 11, color: '#7de87d',
+              borderTop: '1px solid rgba(244,231,208,0.1)', paddingTop: 16,
+            }}>
+              {data.confirmed} bestelling{data.confirmed === 1 ? '' : 'en'} bevestigd — tickets aangemaakt en e-mails verstuurd.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── TicketDetails ────────────────────────────────────────────────────────────
 
 function TicketDetails({ order, onRefunded }) {
@@ -438,20 +648,29 @@ export default function OrdersTable() {
 
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
+  const [reconcileOpen, setReconcileOpen] = useState(false);
+
   // ── load ──
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setLoadError(null);
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*, ticket_tiers(name)')
-        .order('created_at', { ascending: false });
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await fetchOrders();
+      if (cancelled) return;
       if (error) { setLoadError(error.message); }
       else { setOrders(data); }
       setLoading(false);
-    }
-    load();
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Silent refetch for the reconcile panel — without it the table keeps showing
+  // 'expired' for orders that were just confirmed. Deliberately doesn't touch
+  // `loading`: the rows are already on screen and should update in place rather
+  // than flashing the whole table back to a spinner.
+  const refetch = useCallback(async () => {
+    const { data, error } = await fetchOrders();
+    if (error) { setLoadError(error.message); }
+    else { setOrders(data); }
   }, []);
 
   // ── computed totals (always from full paid set) ──
@@ -514,6 +733,18 @@ export default function OrdersTable() {
               {orders.length} TOTAAL
             </span>
             <button
+              style={{
+                ...s.btnGhost,
+                borderColor: reconcileOpen ? 'rgba(255,150,30,0.4)' : 'rgba(244,231,208,0.2)',
+                color: reconcileOpen ? 'var(--orange-bright)' : 'var(--cream)',
+              }}
+              onClick={() => setReconcileOpen(v => !v)}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(244,231,208,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              Betalingen controleren
+            </button>
+            <button
               style={s.btnGhost}
               onClick={() => exportCSV(orders)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(244,231,208,0.08)'}
@@ -524,6 +755,15 @@ export default function OrdersTable() {
           </div>
         )}
       </div>
+
+      {/* Payment reconciliation — recovers orders paid at Mollie but never
+          confirmed here. Mounted fresh each time so it always re-checks. */}
+      {reconcileOpen && (
+        <ReconcilePanel
+          onClose={() => setReconcileOpen(false)}
+          onApplied={refetch}
+        />
+      )}
 
       {/* Summary bar */}
       {!loading && !loadError && (

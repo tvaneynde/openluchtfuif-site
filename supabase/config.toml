@@ -1,0 +1,57 @@
+# Supabase project config.
+#
+# This file exists for exactly one reason: verify_jwt is a property of the
+# *deployed* function, not of the source. It used to be set once by hand with
+# `supabase functions deploy mollie-webhook --no-verify-jwt`, and nothing in the
+# repo recorded that. The deploy in commit bb41dda (2026-07-27) left the flag
+# off the command line, so mollie-webhook silently went back to the default
+# (true) and started answering Mollie's callback with
+# 401 UNAUTHORIZED_NO_AUTH_HEADER. Payments kept succeeding at Mollie while
+# confirm_payment never ran, so every order sat at awaiting_payment until
+# expire_old_orders swept it to expired — no tickets, no email, for five days.
+#
+# With this file checked in, `supabase functions deploy` reads the flag from
+# here and the setting survives every future deploy. Keep every function listed
+# explicitly, including the `true` ones: an absent entry is what caused the
+# outage in the first place.
+
+project_id = "noihnuouftyvsvzybwer"
+
+# ---- Mollie's payment callback ----
+# Mollie is a third-party server. It has no Supabase session and sends no
+# Authorization header, so JWT verification MUST stay off or the webhook is
+# unreachable. This is not a security hole: the handler ignores the request body
+# and re-fetches the payment from the Mollie API before trusting anything.
+[functions.mollie-webhook]
+verify_jwt = false
+
+# ---- Browser-called functions ----
+# All of these are reached from the site or the dashboard through supabase-js,
+# which attaches the anon (or the logged-in admin's) key automatically, so JWT
+# verification is satisfied and costs nothing.
+#
+# Note that verify_jwt = true is NOT an authorization check — the anon key is
+# bundled in the public JS build and is itself a valid JWT. Any function that
+# must be admin-only enforces that itself by calling auth.getUser() on the
+# caller's token (see reconcile-payments).
+
+[functions.create-payment]
+verify_jwt = true
+
+[functions.scan]
+verify_jwt = true
+
+[functions.scanner-cache]
+verify_jwt = true
+
+[functions.download-ticket]
+verify_jwt = true
+
+[functions.process-email-queue]
+verify_jwt = true
+
+[functions.send-abandoned-reminders]
+verify_jwt = true
+
+[functions.reconcile-payments]
+verify_jwt = true
