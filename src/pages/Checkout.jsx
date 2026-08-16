@@ -5,6 +5,13 @@ function formatCents(cents) {
   return '€' + (cents / 100).toFixed(2).replace('.', ',');
 }
 
+// Mirrors MAX_BUNDLES in create-payment. Going past it only earns a rejected
+// checkout, so the stepper stops here.
+const MAX_BUNDLES = 5;
+const MAX_SINGLES = 10;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function Checkout() {
   const [tiers, setTiers] = useState([]);
   const [selectedTier, setSelectedTier] = useState(null);
@@ -12,7 +19,12 @@ export default function Checkout() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [emailRepeat, setEmailRepeat] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  // `units` is what the buyer is charged for: bundles on a group tier, single
+  // tickets otherwise. The ticket count sent to the server is always
+  // units × groupSize, because orders.quantity counts tickets on every tier.
+  const [units, setUnits] = useState(1);
+  const [splitTickets, setSplitTickets] = useState(false);
+  const [attendees, setAttendees] = useState([]); // [{ name, email }] by seat
   const [promoCode, setPromoCode] = useState('');
   const [promoResult, setPromoResult] = useState(null); // null | { discount_cents, description, code } | { error: string }
   const [promoValidating, setPromoValidating] = useState(false);
@@ -34,20 +46,66 @@ export default function Checkout() {
       .then(({ data }) => {
         if (data) {
           setTiers(data);
+          // Preselect the first tier that can actually be bought, not simply
+          // data[0]. Tiers are ordered by sort_order, so once Early Bird sold
+          // out every buyer landed on checkout with a sold-out tier selected;
+          // filling in the form and pressing Betalen then failed with
+          // "Uitverkocht" from create-payment, and only someone who noticed the
+          // badge would think to click the other tier. A preselected link
+          // (?tier_id=) still wins, even if that tier is sold out — the buyer
+          // asked for it by name and should see why it can't be bought.
+          const firstAvailable = data.find((t) => !t.is_sold_out) ?? data[0];
           if (preselectedId) {
             const found = data.find((t) => String(t.id) === preselectedId);
-            if (found) setSelectedTier(found);
+            setSelectedTier(found ?? firstAvailable);
+          } else if (data.length > 0) {
+            setSelectedTier(firstAvailable);
           }
-          if (!preselectedId && data.length > 0) setSelectedTier(data[0]);
         }
         setLoading(false);
       });
   }, []);
 
+  // ── Bundle maths ───────────────────────────────────────────────────────────
+  // Kept identical to create-payment: price and discount are per UNIT, capacity
+  // and the guest list are per TICKET.
+  const groupSize  = selectedTier?.group_size ?? null;
+  const maxUnits   = groupSize ? MAX_BUNDLES : MAX_SINGLES;
+  const quantity   = units * (groupSize ?? 1);
+
   const discountCents = promoResult && !promoResult.error ? promoResult.discount_cents : 0;
   const totalCents = selectedTier
-    ? Math.max(0, (selectedTier.price_cents + selectedTier.fee_cents) * quantity - discountCents)
+    ? Math.max(0, (selectedTier.price_cents + selectedTier.fee_cents) * units - discountCents)
     : 0;
+
+  // Switching between a bundle tier and a single tier changes what the stepper
+  // counts, so a leftover "3" would silently mean 3 bundles instead of 3
+  // tickets. Reset it here rather than in an effect, and drop the promo: a
+  // tier-scoped code for the old tier would show a discount in the total that
+  // create-payment then refuses.
+  function selectTier(tier) {
+    if (tier.id === selectedTier?.id) return;
+    setSelectedTier(tier);
+    setUnits(1);
+    setPromoResult(null);
+  }
+
+  // `attendees` is addressed by seat index and is deliberately allowed to be
+  // shorter than the order — a buyer who names three of ten guests sends three
+  // rows. Only the first `quantity` entries are ever read, so shrinking the
+  // order drops the extra seats without any bookkeeping.
+  const seats = Array.from({ length: quantity }, (_, i) => attendees[i] ?? { name: '', email: '' });
+  const badSeat = seats.findIndex((a) => a.email.trim() && !EMAIL_RE.test(a.email.trim()));
+  const namedSeats = seats.filter((a) => a.email.trim()).length;
+
+  function setSeat(i, field, value) {
+    setAttendees((prev) => {
+      const next = [...prev];
+      while (next.length <= i) next.push({ name: '', email: '' });
+      next[i] = { ...next[i], [field]: value };
+      return next;
+    });
+  }
 
   async function validatePromo() {
     if (!promoCode || !selectedTier || !supabase) return;
@@ -74,12 +132,21 @@ export default function Checkout() {
         setPromoResult({ error: 'Promotiecode is niet meer geldig' });
         return;
       }
+      // Same rule create-payment applies. Checking it here means the buyer is
+      // told before they pay, instead of at the very last click.
+      if (promo.tier_id && promo.tier_id !== selectedTier.id) {
+        setPromoResult({ error: 'Deze code geldt niet voor dit ticket' });
+        return;
+      }
 
+      // Per unit, not per ticket: on a group tier price_cents is the price of
+      // the whole bundle, so multiplying by the ticket count would promise a
+      // discount ten times bigger than the server will give.
       let discount = 0;
       if (promo.discount_type === 'percent') {
-        discount = Math.round((selectedTier.price_cents * promo.discount_value / 100) * quantity);
+        discount = Math.round((selectedTier.price_cents * promo.discount_value / 100) * units);
       } else {
-        discount = Math.min(promo.discount_value * quantity, selectedTier.price_cents * quantity);
+        discount = Math.min(promo.discount_value * units, selectedTier.price_cents * units);
       }
 
       const discountLabel = promo.discount_type === 'percent'
@@ -107,6 +174,9 @@ export default function Checkout() {
     if (!name.trim()) return setError('Vul je naam in.');
     if (!email.trim()) return setError('Vul je e-mailadres in.');
     if (email !== emailRepeat) return setError('E-mailadressen komen niet overeen.');
+    if (splitTickets && badSeat !== -1) {
+      return setError(`Het e-mailadres voor ticket ${badSeat + 1} klopt niet.`);
+    }
 
     setSubmitting(true);
     try {
@@ -125,6 +195,17 @@ export default function Checkout() {
           quantity,
           buyer_name: name,
           buyer_email: email,
+          // Omitted entirely when the buyer keeps all tickets — an empty array
+          // is still a valid instruction to clear the list, and sending it on
+          // every order would be noise.
+          ...(splitTickets && namedSeats > 0
+            ? {
+                attendees: seats.map((a) => ({
+                  name: a.name.trim(),
+                  email: a.email.trim(),
+                })),
+              }
+            : {}),
           ...(promoResult && !promoResult.error ? { promo_code: promoResult.code } : {}),
         }),
       });
@@ -135,12 +216,15 @@ export default function Checkout() {
         setError(data.error || data.message || `Fout ${res.status}. Probeer opnieuw.`);
         return;
       }
+      // location.assign() rather than assigning to location.href: identical
+      // behaviour, but the React compiler's immutability rule reads the property
+      // assignment as mutating a value it tracks and errors on it.
       if (data.alreadyPaid || data.free) {
-        window.location.href = `/#/bedankt?order_id=${data.orderId}`;
+        window.location.assign(`/#/bedankt?order_id=${data.orderId}`);
         return;
       }
       if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        window.location.assign(data.checkoutUrl);
         return;
       }
       setError(data.error || 'Er ging iets mis. Probeer opnieuw.');
@@ -271,6 +355,49 @@ export default function Checkout() {
       display: 'flex',
       alignItems: 'center',
       gap: '1rem',
+    },
+    splitBox: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.6rem',
+    },
+    splitOption: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '0.7rem',
+      border: '1px solid rgba(255,255,255,0.13)',
+      borderRadius: '10px',
+      padding: '0.85rem 1rem',
+      cursor: 'pointer',
+      background: 'rgba(255,255,255,0.03)',
+      fontSize: '0.92rem',
+      lineHeight: 1.4,
+    },
+    radio: {
+      accentColor: 'var(--orange)',
+      marginTop: '0.2rem',
+      flexShrink: 0,
+    },
+    splitHint: {
+      display: 'block',
+      color: 'var(--cream-dim)',
+      fontSize: '0.8rem',
+      marginTop: '0.25rem',
+      lineHeight: 1.5,
+    },
+    seatRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      marginBottom: '0.5rem',
+    },
+    seatNum: {
+      fontFamily: 'var(--mono)',
+      fontSize: '0.75rem',
+      color: 'var(--cream-dim)',
+      width: '1.5rem',
+      flexShrink: 0,
+      textAlign: 'right',
     },
     stepBtn: {
       width: '2.5rem',
@@ -431,15 +558,26 @@ export default function Checkout() {
                   <div
                     key={tier.id}
                     style={s.tierCard(active)}
-                    onClick={() => setSelectedTier(tier)}
+                    onClick={() => selectTier(tier)}
                     role="radio"
                     aria-checked={active}
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && setSelectedTier(tier)}
+                    onKeyDown={(e) => e.key === 'Enter' && selectTier(tier)}
                   >
                     <div>
                       <div style={s.tierName}>{tier.name}</div>
-                      <div style={s.tierFee}>+ {formatCents(tier.fee_cents)} transactiekosten</div>
+                      {/* On a bundle tier the big price is the price of the
+                          whole bundle, which is easy to misread as a per-person
+                          price — so always spell out both. */}
+                      {tier.group_size ? (
+                        <div style={s.tierFee}>
+                          {tier.group_size} tickets ·{' '}
+                          {formatCents(Math.round(tier.price_cents / tier.group_size))} per persoon
+                          {tier.fee_cents > 0 && ` · + ${formatCents(tier.fee_cents)} transactiekosten`}
+                        </div>
+                      ) : (
+                        <div style={s.tierFee}>+ {formatCents(tier.fee_cents)} transactiekosten</div>
+                      )}
                       {/* Scarcity nudge only — never a count */}
                       {(low || tier.is_sold_out) && (
                         <div style={s.capacityBadge(low)}>
@@ -449,6 +587,11 @@ export default function Checkout() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={s.tierPrice}>{formatCents(tier.price_cents)}</div>
+                      {tier.group_size && (
+                        <div style={{ ...s.tierFee, marginTop: '0.15rem' }}>
+                          per groep
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -488,37 +631,125 @@ export default function Checkout() {
               required
             />
 
-            {/* Quantity */}
-            <p style={s.sectionLabel}>03 — Aantal</p>
+            {/* Quantity — counts bundles on a group tier, tickets otherwise */}
+            <p style={s.sectionLabel}>
+              03 — {groupSize ? 'Aantal groepstickets' : 'Aantal'}
+            </p>
             <div style={s.stepperRow}>
               <button
                 type="button"
                 style={s.stepBtn}
-                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                onClick={() => setUnits((u) => Math.max(1, u - 1))}
                 aria-label="Minder"
               >
                 −
               </button>
-              <span style={s.qtyDisplay}>{quantity}</span>
+              <span style={s.qtyDisplay}>{units}</span>
               <button
                 type="button"
                 style={s.stepBtn}
-                onClick={() => setQuantity((q) => Math.min(4, q + 1))}
+                // Not a display choice — these are the limits create-payment
+                // enforces. Letting the stepper go past them would only produce
+                // a rejected checkout further down.
+                onClick={() => setUnits((u) => Math.min(maxUnits, u + 1))}
                 aria-label="Meer"
               >
                 +
               </button>
-              <span style={{ color: 'var(--cream-dim)', fontSize: '0.82rem', fontFamily: 'var(--mono)' }}>
-                max. 4 per bestelling
-              </span>
+              {groupSize && (
+                <span style={{ color: 'var(--cream-dim)', fontSize: '0.9rem' }}>
+                  = <strong style={{ color: 'var(--cream)' }}>{quantity} tickets</strong>
+                </span>
+              )}
             </div>
 
+            {/* Guest list — every ticket gets its own QR either way; this only
+                decides who receives it. */}
+            {quantity > 1 && (
+              <>
+                <p style={s.sectionLabel}>04 — Verdeling</p>
+                <div style={s.splitBox}>
+                  <label style={s.splitOption}>
+                    <input
+                      type="radio"
+                      checked={!splitTickets}
+                      onChange={() => setSplitTickets(false)}
+                      style={s.radio}
+                    />
+                    <span>
+                      <strong>Stuur alle {quantity} tickets naar mij</strong>
+                      <span style={s.splitHint}>
+                        Je krijgt {quantity} aparte QR-codes in één e-mail en één PDF.
+                      </span>
+                    </span>
+                  </label>
+                  <label style={s.splitOption}>
+                    <input
+                      type="radio"
+                      checked={splitTickets}
+                      onChange={() => setSplitTickets(true)}
+                      style={s.radio}
+                    />
+                    <span>
+                      <strong>Stuur elk ticket rechtstreeks naar de persoon zelf</strong>
+                      <span style={s.splitHint}>
+                        Iedereen krijgt meteen zijn eigen ticket. Jij ontvangt sowieso
+                        alle tickets als reserve.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {splitTickets && (
+                  <div style={{ marginTop: '1rem' }}>
+                    {seats.map((seat, i) => {
+                      const invalid = seat.email.trim() && !EMAIL_RE.test(seat.email.trim());
+                      return (
+                        <div key={i} style={s.seatRow}>
+                          <span style={s.seatNum}>{i + 1}</span>
+                          <input
+                            type="text"
+                            placeholder="Naam (optioneel)"
+                            value={seat.name}
+                            onChange={(e) => setSeat(i, 'name', e.target.value)}
+                            style={{ ...s.input, marginBottom: 0, flex: '1 1 34%', minWidth: 0 }}
+                          />
+                          <input
+                            type="email"
+                            placeholder="E-mailadres"
+                            value={seat.email}
+                            onChange={(e) => setSeat(i, 'email', e.target.value)}
+                            style={{
+                              ...s.input,
+                              marginBottom: 0,
+                              flex: '1 1 50%',
+                              minWidth: 0,
+                              borderColor: invalid ? 'rgba(220,40,40,0.6)' : 'rgba(255,255,255,0.15)',
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                    <p style={s.splitHint}>
+                      Laat een regel leeg als je dat ticket zelf wil houden — dat ticket
+                      komt dan gewoon in jouw mail terecht.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Promo code */}
-            <p style={s.sectionLabel}>04 — Promotiecode (optioneel)</p>
+            <p style={s.sectionLabel}>
+              {quantity > 1 ? '05' : '04'} — Promotiecode (optioneel)
+            </p>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="text"
-                placeholder="bv. PERS2026"
+                // No placeholder: the example used to be PERS2026, which was
+                // retired in migration 0032, so it advertised a code that no
+                // longer validates. The section label above already says what
+                // this field is for.
                 value={promoCode}
                 onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
                 style={{ ...s.input, marginBottom: 0, flex: 1, textTransform: 'uppercase', letterSpacing: '0.1em' }}
@@ -555,20 +786,31 @@ export default function Checkout() {
             )}
 
             {/* Summary */}
-            <p style={s.sectionLabel}>05 — Overzicht</p>
+            <p style={s.sectionLabel}>{quantity > 1 ? '06' : '05'} — Overzicht</p>
             <div style={s.summaryBox}>
               {selectedTier ? (
                 <>
                   <div style={s.summaryRow}>
-                    <span>{selectedTier.name}</span>
                     <span>
-                      {quantity} × {formatCents(selectedTier.price_cents)}
+                      {selectedTier.name}
+                      {groupSize && (
+                        <span style={{ opacity: 0.6 }}> ({quantity} tickets)</span>
+                      )}
+                    </span>
+                    <span>
+                      {units} × {formatCents(selectedTier.price_cents)}
                     </span>
                   </div>
                   <div style={s.summaryRow}>
                     <span>Transactiekosten</span>
-                    <span>{formatCents(selectedTier.fee_cents * quantity)}</span>
+                    <span>{formatCents(selectedTier.fee_cents * units)}</span>
                   </div>
+                  {splitTickets && namedSeats > 0 && (
+                    <div style={s.summaryRow}>
+                      <span>Rechtstreeks verstuurd</span>
+                      <span>{namedSeats} van {quantity}</span>
+                    </div>
+                  )}
                   {discountCents > 0 && (
                     <div style={{ ...s.summaryRow, color: '#7de87d' }}>
                       <span>Korting</span>
@@ -589,10 +831,13 @@ export default function Checkout() {
 
             {error && <div style={s.errorBanner}>{error}</div>}
 
+            {/* Blocked on is_sold_out too: create-payment rejects a sold-out
+                tier anyway, so letting the buyer fill in the whole form and
+                press Betalen only to be told "Uitverkocht" wastes the sale. */}
             <button
               type="submit"
-              style={s.cta(submitting || !selectedTier)}
-              disabled={submitting || !selectedTier}
+              style={s.cta(submitting || !selectedTier || selectedTier.is_sold_out || (splitTickets && badSeat !== -1))}
+              disabled={submitting || !selectedTier || selectedTier.is_sold_out || (splitTickets && badSeat !== -1)}
             >
               {submitting ? (
                 <>

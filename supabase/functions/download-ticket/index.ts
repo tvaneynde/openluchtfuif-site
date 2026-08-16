@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   // Fetch order + tickets
   const { data: order, error } = await db
     .from('orders')
-    .select('buyer_name, buyer_email, status, ticket_tiers(name), tickets(ticket_number, scan_token, status)')
+    .select('buyer_name, buyer_email, status, ticket_tiers(name), tickets(ticket_number, scan_token, status, attendee_name)')
     .eq('id', orderId)
     .single()
 

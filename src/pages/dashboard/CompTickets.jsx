@@ -240,14 +240,16 @@ function IssueModal({ onClose, onIssued }) {
     // have no webhook — so without this the mail waits on the pg_cron safety net
     // and may never go out at all.
     setSaving(true);
-    const { error: mailError } = await supabase.functions.invoke('process-email-queue', {
+    const { data: mailData, error: mailError } = await supabase.functions.invoke('process-email-queue', {
       body: { order_id: data.order_id },
     });
     setSaving(false);
 
-    onIssued(mailError
-      ? { ok: false, message: `${made}, maar de e-mail kon niet verstuurd worden (${mailError.message}). Probeer de Mail-knop in de lijst.` }
-      : { ok: true, message: `${made} en gemaild naar ${form.email.trim()}.` });
+    // Same trap as the Mail button: a 200 with sent:0 means nothing went out.
+    const sent = !mailError && mailData?.sent > 0;
+    onIssued(sent
+      ? { ok: true, message: `${made} en gemaild naar ${form.email.trim()}.` }
+      : { ok: false, message: `${made}, maar de e-mail kon niet verstuurd worden${mailError ? ` (${mailError.message})` : ''}. Probeer de Mail-knop in de lijst.` });
   }
 
   return (
@@ -359,10 +361,17 @@ function ResendButton({ orderId }) {
   async function handleResend() {
     if (state === 'loading') return;
     setState('loading');
-    const { error } = await supabase.functions.invoke('process-email-queue', {
+    const { data, error } = await supabase.functions.invoke('process-email-queue', {
       body: { order_id: orderId, force: true },
     });
-    setState(error ? 'error' : 'ok');
+    // `error` alone is not enough: the worker answers 200 {processed:0} when it
+    // has nothing to send, and reporting that as "✓ Verzonden" is exactly how 21
+    // sponsor batches were believed to be mailed when they never were.
+    const actuallySent = !error && data?.sent > 0;
+    if (!actuallySent) {
+      console.error('Comp mail not sent for order', orderId, { error, data });
+    }
+    setState(actuallySent ? 'ok' : 'error');
     setTimeout(() => setState('idle'), 3000);
   }
 

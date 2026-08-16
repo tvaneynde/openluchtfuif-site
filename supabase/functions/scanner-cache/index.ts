@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const [{ data: tickets }, { count: scannedToday }, { count: stillValid }] = await Promise.all([
       db
         .from('tickets')
-        .select('scan_token, ticket_number, status, orders(buyer_name), ticket_tiers(name)')
+        .select('scan_token, ticket_number, status, attendee_name, orders(buyer_name), ticket_tiers(name)')
         .eq('status', 'valid'),
       db
         .from('scan_events')
@@ -73,7 +73,10 @@ Deno.serve(async (req) => {
         scan_token:    t.scan_token,
         ticket_number: t.ticket_number,
         status:        'valid',
-        buyer_name:    t.orders?.buyer_name ?? '',
+        // The person this ticket belongs to. On a group order every ticket names
+        // a different guest, so showing the buyer for all ten would make the
+        // name on screen useless at the gate.
+        buyer_name:    t.attendee_name || t.orders?.buyer_name || '',
         tier_name:     t.ticket_tiers?.name ?? '',
       })),
       stats: {

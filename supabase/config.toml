@@ -25,15 +25,33 @@ project_id = "noihnuouftyvsvzybwer"
 [functions.mollie-webhook]
 verify_jwt = false
 
+# ---- Opened as a plain link ----
+# download-ticket is reached with <a href> — the "PDF" button in the dashboard's
+# free-tickets list and the "Download tickets" button on the public thank-you
+# page. A browser navigation sends no apikey and no Authorization header, so the
+# gateway answers UNAUTHORIZED_NO_AUTH_HEADER and the user sees raw JSON in a
+# new tab instead of their ticket. It must stay false for the same reason as the
+# webhook: nothing is there to attach a header.
+#
+# The trade-off is deliberate and pre-existing: the endpoint is keyed only on
+# order_id, so anyone holding that UUID can fetch the PDF. Order ids are v4
+# UUIDs and can no longer be enumerated (migration 000023 closed that leak), so
+# knowing one is itself reasonable evidence of having placed the order.
+[functions.download-ticket]
+verify_jwt = false
+
 # ---- Browser-called functions ----
-# All of these are reached from the site or the dashboard through supabase-js,
-# which attaches the anon (or the logged-in admin's) key automatically, so JWT
-# verification is satisfied and costs nothing.
+# These are reached from the site or the dashboard by code that sets headers:
+# supabase-js functions.invoke() attaches Authorization, and the hand-rolled
+# fetch() calls in Checkout.jsx / Scanner.jsx send apikey. Either one satisfies
+# the gateway — apikey alone is enough; it is specifically the *header-less*
+# request that gets rejected.
 #
 # Note that verify_jwt = true is NOT an authorization check — the anon key is
 # bundled in the public JS build and is itself a valid JWT. Any function that
 # must be admin-only enforces that itself by calling auth.getUser() on the
-# caller's token (see reconcile-payments).
+# caller's token (see reconcile-payments); scan and scanner-cache use the
+# X-Scanner-Key PIN.
 
 [functions.create-payment]
 verify_jwt = true
@@ -42,9 +60,6 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.scanner-cache]
-verify_jwt = true
-
-[functions.download-ticket]
 verify_jwt = true
 
 [functions.process-email-queue]

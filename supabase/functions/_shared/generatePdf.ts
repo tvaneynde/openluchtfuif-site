@@ -38,8 +38,14 @@ export interface TicketOrder {
 }
 
 export interface TicketItem {
-  ticket_number: string
-  scan_token:    string
+  ticket_number:  string
+  scan_token:     string
+  /**
+   * Whose ticket this is, when a group buyer named the person it was bought
+   * for. NULL/absent on every ordinary sale and on every ticket issued before
+   * group tickets existed, which is why the page falls back to the buyer.
+   */
+  attendee_name?: string | null
 }
 
 export async function generateTicketPdf(
@@ -172,7 +178,7 @@ export async function generateTicketPdf(
 
     // Info rows
     const rows: [string, string][] = [
-      ['NAAM',       order.buyer_name],
+      ['NAAM',       ticket.attendee_name || order.buyer_name],
       ['CATEGORIE',  order.ticket_tiers?.name ?? 'Ticket'],
       ['DATUM',      'Zaterdag 29 augustus 2026'],
       ['TIJD',       'Deuren open vanaf 16:00'],

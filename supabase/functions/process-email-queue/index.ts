@@ -28,24 +28,29 @@ const CORS = {
 // ─────────────────────────────────────────────────────────────
 // Beautiful email HTML (logo embedded, QR per ticket)
 // ─────────────────────────────────────────────────────────────
-async function buildEmailHtml(
+function buildEmailHtml(
   order: Record<string, any>,
-  tickets: Array<{ ticket_number: string; scan_token: string; qrDataUrl: string }>,
-): Promise<string> {
-  // Fetch logo as base64 for email embedding (chunked to avoid stack overflow)
-  let logoBase64 = ''
-  try {
-    const res    = await fetch(LOGO_URL)
-    const bytes  = new Uint8Array(await res.arrayBuffer())
-    let binary   = ''
-    const chunk  = 0x8000
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
-    }
-    logoBase64 = btoa(binary)
-  } catch (_) {}
-
-  const logoSrc  = logoBase64 ? `data:image/png;base64,${logoBase64}` : LOGO_URL
+  tickets: Array<{ ticket_number: string; scan_token: string; qrCid: string; attendee_name?: string | null }>,
+  // Who this particular copy is addressed to. NULL for the buyer's copy, which
+  // carries every ticket; set for a guest on a group order, whose copy carries
+  // only their own. Used for the greeting — the ticket cards always show the
+  // name that belongs to each individual ticket.
+  greetingName: string,
+  isGuestCopy: boolean,
+): string {
+  // The logo is referenced by URL, never inlined as a data: URI.
+  //
+  // It used to be fetched and base64-embedded, which produced a single
+  // 390,780-character src="" attribute (the source PNG is 293 KB). RFC 5322
+  // caps a line at 998 octets, so an MTA hard-wrapped that attribute mid-value,
+  // terminated the <img> tag early, and dumped the remaining base64 into the
+  // document as visible text across the orange header band. Resend's preview
+  // renders the pre-transport HTML, so it looked perfect there and broken in
+  // the inbox — see Margaux Dunon's ticket, 2026-08-02.
+  //
+  // Gmail also refuses data: URIs in img src outright, and clips any message
+  // body over ~102 KB. A plain HTTPS URL avoids all three problems.
+  const logoSrc  = LOGO_URL
   const tierName = order.ticket_tiers?.name ?? 'Ticket'
 
   // Ticket cards — one per ticket, styled exactly like the PDF
@@ -64,9 +69,22 @@ async function buildEmailHtml(
               </td>
             </tr>
           </table>
-          <!-- QR code -->
-          <img src="${t.qrDataUrl}" width="210" height="210" alt="QR code"
-            style="display:block;margin:0 auto 14px;padding:12px;background:#ffffff;border-radius:6px;" />
+          <!-- QR code — a cid: reference to an inline attachment, not a data:
+               URI. Gmail strips data: URIs in img src, so the QR (the one part
+               of this mail that actually gets someone through the gate) simply
+               did not render for Gmail recipients.
+               Centred by align="center" on a wrapper table, not margin:0 auto:
+               mail clients widely ignore auto margins on a block-level image,
+               which left-aligned the code inside the card. The white plate sits
+               on the wrapper cell so it hugs the QR, and line-height:0 kills the
+               descender gap under the image. -->
+          <table align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 14px;">
+            <tr>
+              <td align="center" style="background:#ffffff;border-radius:6px;padding:12px;line-height:0;font-size:0;">
+                <img src="cid:${t.qrCid}" width="210" height="210" alt="QR code" style="display:block;border:0;" />
+              </td>
+            </tr>
+          </table>
           <p style="margin:0;font-family:monospace;font-size:10px;letter-spacing:0.2em;color:#f07a3c;text-transform:uppercase;">Toon aan de ingang</p>
         </td>
       </tr>
@@ -76,7 +94,10 @@ async function buildEmailHtml(
         <td style="background:#1a0820;padding:20px 24px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             ${[
-              ['Naam',      order.buyer_name],
+              // The name on THIS ticket. On a group order every ticket can carry
+              // a different guest; falling back to the buyer keeps every ticket
+              // sold before group tickets existed rendering exactly as it did.
+              ['Naam',      t.attendee_name || order.buyer_name],
               ['Categorie', tierName],
               ['Datum',     'Zaterdag 29 augustus 2026'],
               ['Deuren',    'Vanaf 16:00'],
@@ -133,29 +154,23 @@ async function buildEmailHtml(
   <!-- Greeting -->
   <tr><td style="background:#1e0b28;padding:24px 28px 0;border-left:1px solid #3d1a50;border-right:1px solid #3d1a50;">
     <p style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;color:#f4e7d0;">
-      Hey <strong>${order.buyer_name.split(' ')[0]}</strong>!
+      Hey <strong>${greetingName.split(' ')[0]}</strong>!
     </p>
     <p style="margin:0 0 24px;font-family:Arial,sans-serif;font-size:13px;color:rgba(244,231,208,0.6);line-height:1.65;">
-      Je bestelling is bevestigd. Hieronder vind je je ticket${tickets.length > 1 ? 's' : ''} voor de Openluchtfuif.
+      ${isGuestCopy
+        ? `<strong>${order.buyer_name}</strong> heeft een ticket voor je geregeld voor de Openluchtfuif.
+           Hieronder vind je je persoonlijke ticket${tickets.length > 1 ? 's' : ''} &mdash; je hoeft dus niet
+           samen met de groep binnen te komen.`
+        : `Je bestelling is bevestigd. Hieronder vind je je ticket${tickets.length > 1 ? 's' : ''} voor de Openluchtfuif.`}
       Toon de QR-code aan de ingang &mdash; je smartphonescherm volstaat.
     </p>
   </td></tr>
 
   <!-- Ticket cards -->
-  <tr><td style="background:#1e0b28;padding:0 28px;border-left:1px solid #3d1a50;border-right:1px solid #3d1a50;">
-    ${ticketCards}
-  </td></tr>
-
-  <!-- Practical info — mirrors PDF info box -->
+  <!-- Carries the 28px bottom padding that the practical-info block used to
+       provide; without it the last ticket card butts straight into the footer. -->
   <tr><td style="background:#1e0b28;padding:0 28px 28px;border-left:1px solid #3d1a50;border-right:1px solid #3d1a50;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#160824;border-radius:10px;border:1px solid #3d1a50;padding:20px;">
-      <tr><td style="padding:20px;">
-        <p style="margin:0 0 10px;font-family:monospace;font-size:9px;letter-spacing:0.15em;color:#f07a3c;text-transform:uppercase;">Praktische info</p>
-        <p style="margin:0 0 8px;font-size:13px;color:rgba(244,231,208,0.7);line-height:1.5;">💳 Betalen gaat <strong style="color:#f4e7d0;">cashless</strong> via muntjes — koop ze aan de ingang of op voorhand.</p>
-        <p style="margin:0 0 8px;font-size:13px;color:rgba(244,231,208,0.7);line-height:1.5;">🪪 Jonger dan 18? Breng je <strong style="color:#f4e7d0;">identiteitskaart</strong> mee.</p>
-        <p style="margin:0;font-size:13px;color:rgba(244,231,208,0.7);line-height:1.5;">🚲 Bewaakte <strong style="color:#f4e7d0;">fietsstalling</strong> aanwezig op het terrein.</p>
-      </td></tr>
-    </table>
+    ${ticketCards}
   </td></tr>
 
   <!-- Footer -->
@@ -176,7 +191,9 @@ async function buildEmailHtml(
 // ─────────────────────────────────────────────────────────────
 // Process a single email job
 // ─────────────────────────────────────────────────────────────
-async function processEmailJob(job: { id: string; order_id: string; attempts: number }) {
+async function processEmailJob(job: {
+  id: string; order_id: string; attempts: number; recipient_email?: string | null
+}) {
   await db.from('email_log').update({
     attempts:        job.attempts + 1,
     last_attempt_at: new Date().toISOString(),
@@ -185,24 +202,51 @@ async function processEmailJob(job: { id: string; order_id: string; attempts: nu
   try {
     const { data: order, error: oErr } = await db
       .from('orders')
-      .select('id, buyer_name, buyer_email, status, ticket_tiers(name), tickets(ticket_number, scan_token, status)')
+      .select('id, buyer_name, buyer_email, status, ticket_tiers(name), tickets(ticket_number, scan_token, status, attendee_name, attendee_email)')
       .eq('id', job.order_id)
       .single()
 
     if (oErr || !order) throw new Error(`Order not found: ${job.order_id}`)
     if (order.status !== 'paid') throw new Error(`Order not paid: ${order.status}`)
 
-    const validTickets = (order.tickets as any[]).filter((t: any) => t.status !== 'cancelled')
-    if (!validTickets.length) throw new Error('No valid tickets on order')
+    const allValid = (order.tickets as any[]).filter((t: any) => t.status !== 'cancelled')
+    if (!allValid.length) throw new Error('No valid tickets on order')
 
-    // Generate QR codes for the email
-    const ticketsWithQR = await Promise.all(validTickets.map(async (t: any) => ({
-      ...t,
-      qrDataUrl: await QRCode.toDataURL(t.scan_token, {
+    // A guest copy carries only the tickets addressed to that guest; the buyer's
+    // copy (recipient_email NULL) carries every ticket on the order, which is
+    // exactly what a single-ticket sale has always done.
+    const guestAddress = job.recipient_email?.trim().toLowerCase() || null
+    const validTickets = guestAddress
+      ? allValid.filter((t: any) => (t.attendee_email ?? '').toLowerCase() === guestAddress)
+      : allValid
+
+    if (!validTickets.length) {
+      // The guest's ticket was cancelled, or the address was edited after the
+      // queue row was written. Failing loudly beats mailing them an empty ticket.
+      throw new Error(`No tickets for recipient ${guestAddress} on order ${job.order_id}`)
+    }
+
+    const toAddress   = guestAddress ?? order.buyer_email
+    const greetingName = guestAddress
+      ? (validTickets.find((t: any) => t.attendee_name)?.attendee_name ?? guestAddress.split('@')[0])
+      : order.buyer_name
+
+    // Generate QR codes for the email. Kept as raw base64 (the data: prefix
+    // stripped) because each one is sent as an inline attachment referenced by
+    // Content-ID, not embedded in the HTML.
+    const ticketsWithQR = await Promise.all(validTickets.map(async (t: any) => {
+      const dataUrl = await QRCode.toDataURL(t.scan_token, {
         errorCorrectionLevel: 'H', width: 240, margin: 1,
         color: { dark: '#000000', light: '#ffffff' },
-      }),
-    })))
+      })
+      return {
+        ...t,
+        // Ticket numbers are unique, so this is unique within the message —
+        // which is all a Content-ID has to be.
+        qrCid:    `qr-${t.ticket_number}`,
+        qrBase64: dataUrl.split(',')[1],
+      }
+    }))
 
     // Generate PDF (chunked base64 to avoid call-stack overflow on large files)
     const pdfBytes  = await generateTicketPdf(order as any, validTickets)
@@ -214,7 +258,7 @@ async function processEmailJob(job: { id: string; order_id: string; attempts: nu
     const pdfBase64 = btoa(pdfBinary)
 
     // Build email HTML
-    const html       = await buildEmailHtml(order as any, ticketsWithQR)
+    const html       = buildEmailHtml(order as any, ticketsWithQR, greetingName, !!guestAddress)
     const subject    = validTickets.length > 1
       ? `Je ${validTickets.length} tickets voor Openluchtfuif 2026 🎉`
       : `Je ticket voor Openluchtfuif 2026 🎉`
@@ -225,20 +269,35 @@ async function processEmailJob(job: { id: string; order_id: string; attempts: nu
       headers: {
         Authorization:    `Bearer ${RESEND_KEY}`,
         'Content-Type':   'application/json',
+        // Keyed on the QUEUE ROW, not the order. A group order produces one row
+        // for the buyer plus one per guest, all at attempts = 0 — keyed on
+        // order_id they would share an idempotency key, and Resend would replay
+        // the first response for the other ten instead of sending them.
         // Force resends use a timestamp so they're never blocked by Resend's 24h cache
         'Idempotency-Key': (job as any).force
-          ? `ticket-${job.order_id}-force-${Date.now()}`
-          : `ticket-${job.order_id}-${job.attempts + 1}`,
+          ? `ticket-${job.id}-force-${Date.now()}`
+          : `ticket-${job.id}-${job.attempts + 1}`,
       },
       body: JSON.stringify({
         from:    `Openluchtfuif 2026 <${FROM_EMAIL}>`,
-        to:      order.buyer_email,
+        to:      toAddress,
         subject,
         html,
-        attachments: [{
-          filename: `tickets-openluchtfuif-2026.pdf`,
-          content:  pdfBase64,
-        }],
+        attachments: [
+          {
+            filename: `tickets-openluchtfuif-2026.pdf`,
+            content:  pdfBase64,
+          },
+          // One inline image per ticket. content_id is what makes the
+          // cid: reference in the HTML resolve; without it these would show up
+          // as ordinary downloadable attachments instead of rendering in place.
+          ...ticketsWithQR.map((t: any) => ({
+            filename:     `${t.ticket_number}.png`,
+            content:      t.qrBase64,
+            content_type: 'image/png',
+            content_id:   t.qrCid,
+          })),
+        ],
       }),
     })
 
@@ -274,24 +333,96 @@ Deno.serve(async (req) => {
     const forceOrderId: string | undefined = body.order_id
     const force: boolean = body.force ?? false
 
-    let jobs: Array<{ id: string; order_id: string; attempts: number }>
+    let jobs: Array<{ id: string; order_id: string; attempts: number; recipient_email?: string | null }>
 
     if (forceOrderId) {
+      // Every row for this order, not just the newest one. A group order with a
+      // split guest list has one row for the buyer and one per guest; a limit(1)
+      // resend would mail the buyer and silently drop the ten guests.
       const { data } = await db.from('email_log')
-        .select('id, order_id, attempts')
+        .select('id, order_id, attempts, recipient_email')
         .eq('order_id', forceOrderId)
         .in('status', force ? ['pending', 'sent', 'failed'] : ['pending'])
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .order('created_at', { ascending: true })
       jobs = data ?? []
-      if (force && jobs[0]) {
-        await db.from('email_log').update({ status: 'pending' }).eq('id', jobs[0].id)
+
+      // Whether this order has EVER been queued, independent of the status
+      // filter above. The self-heal below must key off this, not off `jobs`.
+      //
+      // `jobs` being empty does not mean "never queued": on a Mollie webhook
+      // retry confirm_payment returns already_processed without inserting a new
+      // row, the webhook still calls us with {order_id} and no force, and the
+      // existing row is 'sent' so it fails the 'pending' filter. Creating a row
+      // in that case would re-send the buyer's tickets on every retry.
+      const { count: everQueued } = await db
+        .from('email_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('order_id', forceOrderId)
+
+      // Never queued at all — create the row instead of silently doing nothing.
+      //
+      // issue_comp_tickets() only inserts an email_log row when p_send_email is
+      // true, so every comp batch issued with the "verstuur e-mail" box
+      // unchecked has tickets but no queue row. The dashboard's Mail button
+      // sends {order_id, force:true} and this branch used to find nothing,
+      // return {processed: 0} with HTTP 200, and let the UI report "✓
+      // Verzonden" for a mail that was never sent. 21 sponsor batches sat
+      // unsent that way.
+      //
+      // Only for an explicitly requested order: the cron path (no order_id)
+      // must keep draining the existing queue and never invent work.
+      // `everQueued === 0`, not `!everQueued`: a failed count returns null, and
+      // treating that as "never queued" would re-send a buyer's tickets. Only
+      // create when we positively know the order has no queue row.
+      if (!jobs.length && everQueued === 0) {
+        const { data: order } = await db
+          .from('orders')
+          .select('id, status, tickets(id)')
+          .eq('id', forceOrderId)
+          .single()
+
+        if (!order) {
+          return new Response(JSON.stringify({ processed: 0, error: 'order_not_found' }), {
+            status: 404, headers: { ...CORS, 'Content-Type': 'application/json' },
+          })
+        }
+        if (order.status !== 'paid') {
+          return new Response(JSON.stringify({ processed: 0, error: 'order_not_paid', status: order.status }), {
+            status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
+          })
+        }
+        if (!(order.tickets as any[])?.length) {
+          return new Response(JSON.stringify({ processed: 0, error: 'no_tickets' }), {
+            status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
+          })
+        }
+
+        // Buyer copy only. The self-heal exists for comp batches issued with
+        // "verstuur e-mail" unchecked, which never have a guest list; a group
+        // sale gets its per-guest rows from confirm_payment().
+        const { data: created, error: insErr } = await db
+          .from('email_log')
+          .insert({ order_id: forceOrderId, type: 'ticket_confirmation', status: 'pending' })
+          .select('id, order_id, attempts, recipient_email')
+          .single()
+
+        if (insErr || !created) {
+          console.error('Could not enqueue email for order', forceOrderId, JSON.stringify(insErr))
+          return new Response(JSON.stringify({ processed: 0, error: 'enqueue_failed' }), {
+            status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
+          })
+        }
+        jobs = [created]
+      } else if (force) {
+        await db.from('email_log')
+          .update({ status: 'pending' })
+          .in('id', jobs.map(j => j.id))
         // Mark as force so processEmailJob uses a timestamp idempotency key
         jobs = jobs.map(j => ({ ...j, force: true } as any))
       }
     } else {
       const { data } = await db.from('email_log')
-        .select('id, order_id, attempts')
+        .select('id, order_id, attempts, recipient_email')
         .eq('status', 'pending')
         .lt('attempts', 5)
         .order('created_at', { ascending: true })

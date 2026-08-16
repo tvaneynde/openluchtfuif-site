@@ -30,6 +30,8 @@ const EMPTY_FORM = {
   sale_ends_at: '',
   is_active: false,
   is_door_sale: false,
+  is_group: false,
+  group_size: '',
   sort_order: 0,
 };
 
@@ -358,7 +360,9 @@ function TierForm({ initial, onSave, onCancel, saving, error }) {
           />
         </div>
         <div style={s.formGroup}>
-          <label style={s.label}>Prijs (€) *</label>
+          <label style={s.label}>
+            {form.is_group ? 'Prijs per groep (€) *' : 'Prijs (€) *'}
+          </label>
           <input
             style={s.input}
             type="number"
@@ -367,8 +371,13 @@ function TierForm({ initial, onSave, onCancel, saving, error }) {
             value={form.price_euros}
             onChange={e => set('price_euros', e.target.value)}
             required
-            placeholder="12.50"
+            placeholder={form.is_group ? '90.00' : '12.50'}
           />
+          {form.is_group && Number(form.group_size) >= 2 && Number(form.price_euros) > 0 && (
+            <div style={{ ...s.mono, fontSize: 10, opacity: 0.55, marginTop: 6 }}>
+              = €{(Number(form.price_euros) / Number(form.group_size)).toFixed(2)} PER TICKET
+            </div>
+          )}
         </div>
         <div style={s.formGroup}>
           <label style={s.label}>Service fee (€)</label>
@@ -393,6 +402,13 @@ function TierForm({ initial, onSave, onCancel, saving, error }) {
             required
             placeholder="500"
           />
+          {/* Capacity is counted in TICKETS on a group tier too — that is what
+              keeps the venue headcount and the sold-out badge honest. Say so,
+              because "capaciteit 100" next to "groep van 10" invites the
+              reading "100 groups". */}
+          <div style={{ ...s.mono, fontSize: 10, opacity: 0.5, marginTop: 6 }}>
+            {form.is_group ? 'IN TICKETS, NIET IN GROEPEN' : 'IN TICKETS'}
+          </div>
         </div>
         <div style={s.formGroup}>
           <label style={s.label}>Sorteervolgorde</label>
@@ -430,6 +446,44 @@ function TierForm({ initial, onSave, onCancel, saving, error }) {
             <span style={{ fontSize: 13, opacity: 0.7 }}>
               {form.is_active ? 'Actief — zichtbaar voor kopers' : 'Inactief — verborgen'}
             </span>
+          </div>
+        </div>
+        <div style={{ ...s.formGroup, gridColumn: '1 / -1' }}>
+          <label style={s.label}>Groepsticket</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <Toggle
+              checked={form.is_group}
+              onChange={val => {
+                set('is_group', val);
+                // A door-sale or comp row with a group_size is rejected by the
+                // ticket_tiers_group_purchasable_check constraint — the two are
+                // priced by code that never runs for those. Clear it here so the
+                // save doesn't fail with a raw Postgres error.
+                if (val) set('is_door_sale', false);
+                if (!val) set('group_size', '');
+              }}
+            />
+            {form.is_group ? (
+              <>
+                <input
+                  style={{ ...s.input, width: 90 }}
+                  type="number"
+                  min="2"
+                  step="1"
+                  value={form.group_size}
+                  onChange={e => set('group_size', e.target.value)}
+                  placeholder="10"
+                />
+                <span style={{ fontSize: 13, opacity: 0.7 }}>
+                  tickets per groep — de koper betaalt de prijs hierboven één keer
+                  en krijgt {form.group_size || 'N'} losse QR-codes
+                </span>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, opacity: 0.7 }}>
+                Gewone tier — prijs geldt per ticket
+              </span>
+            )}
           </div>
         </div>
         <div style={{ ...s.formGroup, gridColumn: '1 / -1' }}>
@@ -507,6 +561,16 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
                 DEURVERKOOP
               </span>
             )}
+            {tier.group_size && (
+              <span style={{
+                ...s.mono, fontSize: 10, letterSpacing: '0.12em',
+                padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(240,140,40,0.14)', color: 'var(--orange)',
+                border: '1px solid rgba(240,140,40,0.4)',
+              }}>
+                GROEP VAN {tier.group_size}
+              </span>
+            )}
           </div>
           {tier.description && (
             <p style={{ margin: 0, opacity: 0.55, fontSize: 13, maxWidth: 480 }}>{tier.description}</p>
@@ -522,7 +586,7 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
         {!tier.is_comp && (
           <>
             <div style={s.stat}>
-              <div style={s.statLabel}>Prijs</div>
+              <div style={s.statLabel}>{tier.group_size ? 'Prijs / groep' : 'Prijs'}</div>
               <div style={s.statValue}>{fmtEuro(tier.price_cents)}</div>
             </div>
             <div style={s.stat}>
@@ -533,6 +597,15 @@ function TierCard({ tier, onEdit, onDelete, onToggleActive }) {
               <div style={s.statLabel}>Totaal</div>
               <div style={s.statValue}>{fmtEuro(tier.price_cents + tier.fee_cents)}</div>
             </div>
+            {/* The number that actually gets compared against a single ticket */}
+            {tier.group_size && (
+              <div style={s.stat}>
+                <div style={s.statLabel}>Per ticket</div>
+                <div style={{ ...s.statValue, color: 'var(--orange)' }}>
+                  {fmtEuro(Math.round((tier.price_cents + tier.fee_cents) / tier.group_size))}
+                </div>
+              </div>
+            )}
           </>
         )}
         {/* Comps have no allotment — only a running total */}
@@ -675,6 +748,12 @@ export default function TierManagement() {
       sale_ends_at: form.sale_ends_at || null,
       is_active: form.is_active,
       is_door_sale: form.is_door_sale,
+      // NULL, never 0 or 1: group_size is the divisor create-payment uses to
+      // turn a ticket count back into a number of bundles, and the column's
+      // CHECK requires >= 2. NULL is what "ordinary tier" means everywhere.
+      group_size: form.is_group && parseInt(form.group_size, 10) >= 2
+        ? parseInt(form.group_size, 10)
+        : null,
       sort_order: parseInt(form.sort_order, 10) || 0,
     };
   }
@@ -707,6 +786,8 @@ export default function TierManagement() {
         sale_ends_at: fmtDatetimeLocal(tier.sale_ends_at),
         is_active: tier.is_active,
         is_door_sale: tier.is_door_sale,
+        is_group: tier.group_size != null,
+        group_size: tier.group_size ?? '',
         sort_order: tier.sort_order,
       },
     });

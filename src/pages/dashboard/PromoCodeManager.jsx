@@ -25,6 +25,7 @@ const EMPTY_FORM = {
   discount_value: '',
   max_uses: '',
   valid_until: '',
+  tier_id: '',
   is_active: true,
 };
 
@@ -188,7 +189,7 @@ function ActiveToggle({ active, onChange, disabled }) {
 
 // ─── New code form ────────────────────────────────────────────────────────────
 
-function NewCodeForm({ onCreated }) {
+function NewCodeForm({ onCreated, tiers }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -224,6 +225,9 @@ function NewCodeForm({ onCreated }) {
         : Math.round(Number(form.discount_value) * 100), // store fixed as cents
       max_uses: form.max_uses ? Number(form.max_uses) : null,
       valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : null,
+      // NULL = every tier, which is how every code behaved before this field
+      // existed. Set = create-payment refuses the code on any other tier.
+      tier_id: form.tier_id || null,
       is_active: form.is_active,
     };
 
@@ -327,6 +331,26 @@ function NewCodeForm({ onCreated }) {
           </div>
         </div>
 
+        <div style={s.fieldGroup}>
+          <label style={s.label}>Geldig voor</label>
+          <select
+            value={form.tier_id}
+            onChange={e => set('tier_id', e.target.value)}
+            style={{ ...s.input, appearance: 'none' }}
+          >
+            <option value="">Alle tickettypes</option>
+            {tiers.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name}{t.group_size ? ` (groep van ${t.group_size})` : ''}
+              </option>
+            ))}
+          </select>
+          <div style={{ ...MONO, color: 'rgba(244,231,208,0.35)', marginTop: 6, letterSpacing: '0.08em' }}>
+            Beperk een code tot één type, bv. een korting die alleen op het
+            groepsticket mag gelden.
+          </div>
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <label style={{ ...s.label, margin: 0 }}>Direct actief</label>
           <ActiveToggle active={form.is_active} onChange={v => set('is_active', v)} />
@@ -344,6 +368,7 @@ function NewCodeForm({ onCreated }) {
 
 export default function PromoCodeManager() {
   const [codes, setCodes] = useState([]);
+  const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -358,7 +383,20 @@ export default function PromoCodeManager() {
     setLoading(false);
   }
 
-  useEffect(() => { loadCodes(); }, []);
+  async function loadTiers() {
+    // Comp tiers are never purchased, so a code scoped to one could never fire.
+    const { data } = await supabase
+      .from('ticket_tiers')
+      .select('id, name, group_size')
+      .eq('is_comp', false)
+      .eq('is_door_sale', false)
+      .order('sort_order');
+    if (data) setTiers(data);
+  }
+
+  useEffect(() => { loadCodes(); loadTiers(); }, []);
+
+  const tierName = id => tiers.find(t => t.id === id)?.name ?? 'Onbekend type';
 
   async function toggleActive(code) {
     setTogglingId(code.id);
@@ -384,7 +422,7 @@ export default function PromoCodeManager() {
         <h1 style={s.pageTitle}>Promo codes</h1>
       </div>
 
-      <NewCodeForm onCreated={loadCodes} />
+      <NewCodeForm onCreated={loadCodes} tiers={tiers} />
 
       <div style={CARD}>
         <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid rgba(244,231,208,0.07)' }}>
@@ -409,6 +447,7 @@ export default function PromoCodeManager() {
                   <th style={s.th}>Code</th>
                   <th style={s.th}>Beschrijving</th>
                   <th style={s.th}>Korting</th>
+                  <th style={s.th}>Geldig voor</th>
                   <th style={s.th}>Gebruik</th>
                   <th style={s.th}>Geldig tot</th>
                   <th style={s.th}>Status</th>
@@ -426,6 +465,11 @@ export default function PromoCodeManager() {
                     </td>
                     <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: '0.82rem', color: '#7de87d' }}>
                       {fmtDiscount(code.discount_type, code.discount_value)}
+                    </td>
+                    <td style={{ ...s.td, fontSize: '0.82rem' }}>
+                      {code.tier_id
+                        ? <span style={{ color: 'var(--orange)' }}>{tierName(code.tier_id)}</span>
+                        : <span style={{ opacity: 0.4 }}>Alle types</span>}
                     </td>
                     <td style={{ ...s.td, fontFamily: 'var(--mono)', fontSize: '0.82rem' }}>
                       {code.used_count ?? 0}

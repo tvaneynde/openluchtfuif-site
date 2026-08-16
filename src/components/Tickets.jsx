@@ -40,14 +40,28 @@ function TicketStub({ tier, index }) {
       {status === 'soldout' && <div className="ticket-stamp">Uitverkocht</div>}
 
       <div className="ticket-main">
-        <div className="ticket-kicker mono">Toegangsbewijs · Editie XIV</div>
+        <div className="ticket-kicker mono">
+          {tier.group_size
+            ? `Groepsticket · ${tier.group_size} personen`
+            : 'Toegangsbewijs · Editie XIV'}
+        </div>
         <h3 className="ticket-name">{tier.name}</h3>
+        {/* On a bundle the big number is the price of the WHOLE group, so the
+            per-person figure has to sit right next to it — otherwise €90 reads
+            as an outrageous single ticket. */}
         <div className="ticket-price-row">
           <span className="ticket-price">€{formatPrice(tier.price_cents)}</span>
-          <span className="ticket-fee mono">+ €{formatPrice(tier.fee_cents)} kosten</span>
+          <span className="ticket-fee mono">
+            {tier.group_size
+              ? `€${formatPrice(Math.round(tier.price_cents / tier.group_size))} p.p.`
+              : `+ €${formatPrice(tier.fee_cents)} kosten`}
+          </span>
         </div>
         <p className="ticket-desc">
-          {tier.description || 'Toegang tot de volledige avond.'}
+          {tier.description
+            || (tier.group_size
+              ? `${tier.group_size} aparte tickets, elk met een eigen QR-code.`
+              : 'Toegang tot de volledige avond.')}
         </p>
 
         {/* No meter bar: its width would give the ratio sold away */}
