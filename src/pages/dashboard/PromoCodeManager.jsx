@@ -13,9 +13,35 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleString('nl-BE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// <input type="datetime-local"> speaks LOCAL time. Slicing the stored ISO string
+// would hand it a UTC value, so every edit-and-save would silently drag the
+// expiry back by the timezone offset — two hours per save in Belgian summer.
 function fmtDateInput(iso) {
   if (!iso) return '';
-  return iso.slice(0, 16);
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function centsToEuroInput(cents) {
+  return (cents / 100).toFixed(2);
+}
+
+/** A stored row → the shape the form edits. */
+function codeToForm(code) {
+  return {
+    code: code.code,
+    description: code.description || '',
+    discount_type: code.discount_type,
+    // Fixed discounts are stored in cents and edited in euros.
+    discount_value: code.discount_type === 'percent'
+      ? String(code.discount_value)
+      : centsToEuroInput(code.discount_value),
+    max_uses: code.max_uses == null ? '' : String(code.max_uses),
+    valid_until: fmtDateInput(code.valid_until),
+    tier_id: code.tier_id || '',
+    is_active: code.is_active,
+  };
 }
 
 const EMPTY_FORM = {
@@ -143,6 +169,25 @@ const s = {
     fontFamily: 'var(--mono)',
     letterSpacing: '0.04em',
   },
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(10,3,14,0.75)',
+    backdropFilter: 'blur(3px)',
+    zIndex: 200,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    padding: '48px 24px',
+    overflowY: 'auto',
+  },
+  modal: {
+    ...CARD,
+    background: '#2a0f33',
+    padding: '28px 32px',
+    width: '100%',
+    maxWidth: 680,
+  },
   successBox: {
     background: 'rgba(80,200,80,0.1)',
     border: '1px solid rgba(80,200,80,0.3)',
@@ -187,13 +232,20 @@ function ActiveToggle({ active, onChange, disabled }) {
   );
 }
 
-// ─── New code form ────────────────────────────────────────────────────────────
+// ─── Create / edit form ───────────────────────────────────────────────────────
+// One component for both. `editing` is the stored row when this is an edit, and
+// null when it is the create card at the top of the page.
 
-function NewCodeForm({ onCreated, tiers }) {
-  const [form, setForm] = useState(EMPTY_FORM);
+function CodeForm({ onSaved, onCancel, tiers, editing = null }) {
+  const [form, setForm] = useState(editing ? codeToForm(editing) : EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+
+  // orders.promo_code is a foreign key onto promo_codes.code with no ON UPDATE
+  // CASCADE, so renaming a code that an order already points at fails with a raw
+  // constraint error. Lock the field instead of letting the save blow up.
+  const codeLocked = !!editing && (editing.used_count ?? 0) > 0;
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -214,6 +266,11 @@ function NewCodeForm({ onCreated, tiers }) {
     if (form.discount_type === 'percent' && Number(form.discount_value) > 100) {
       return setError('Percentage kan niet hoger zijn dan 100');
     }
+    // Lowering the cap below what has already been handed out would make the
+    // code read as exhausted for reasons nobody can see from the form.
+    if (editing && form.max_uses && Number(form.max_uses) < (editing.used_count ?? 0)) {
+      return setError(`Deze code is al ${editing.used_count}× gebruikt — max. gebruik kan niet lager liggen`);
+    }
 
     setSaving(true);
     const payload = {
@@ -230,30 +287,36 @@ function NewCodeForm({ onCreated, tiers }) {
       tier_id: form.tier_id || null,
       is_active: form.is_active,
     };
+    // used_count is deliberately absent from the payload — it is a running total
+    // of real orders, not a setting.
 
-    const { error: insertErr } = await supabase.from('promo_codes').insert(payload);
+    const { error: saveErr } = editing
+      ? await supabase.from('promo_codes').update(payload).eq('id', editing.id)
+      : await supabase.from('promo_codes').insert(payload);
     setSaving(false);
 
-    if (insertErr) {
-      setError(insertErr.message.includes('duplicate') ? 'Deze code bestaat al' : insertErr.message);
+    if (saveErr) {
+      setError(saveErr.message.includes('duplicate') ? 'Deze code bestaat al' : saveErr.message);
       return;
     }
 
     setSuccess(true);
-    setForm(EMPTY_FORM);
-    onCreated();
+    if (!editing) setForm(EMPTY_FORM);
+    onSaved();
   }
 
   const fieldStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 };
 
   return (
-    <div style={{ ...CARD, padding: '28px 32px', marginBottom: 32 }}>
-      <div style={{ ...MONO, color: 'var(--orange)', opacity: 0.85, marginBottom: 20, textTransform: 'uppercase' }}>
-        Nieuwe promotiecode
-      </div>
+    <div style={editing ? { padding: 0 } : { ...CARD, padding: '28px 32px', marginBottom: 32 }}>
+      {!editing && (
+        <div style={{ ...MONO, color: 'var(--orange)', opacity: 0.85, marginBottom: 20, textTransform: 'uppercase' }}>
+          Nieuwe promotiecode
+        </div>
+      )}
 
       {error && <div style={s.errorBox}>{error}</div>}
-      {success && <div style={s.successBox}>Code aangemaakt.</div>}
+      {success && <div style={s.successBox}>{editing ? 'Wijzigingen opgeslagen.' : 'Code aangemaakt.'}</div>}
 
       <form onSubmit={handleSubmit} noValidate>
         <div style={fieldStyle}>
@@ -264,9 +327,22 @@ function NewCodeForm({ onCreated, tiers }) {
               value={form.code}
               onChange={e => set('code', e.target.value.toUpperCase())}
               placeholder="PERS2026"
-              style={{ ...s.input, textTransform: 'uppercase', letterSpacing: '0.1em' }}
+              disabled={codeLocked}
+              style={{
+                ...s.input,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                opacity: codeLocked ? 0.5 : 1,
+                cursor: codeLocked ? 'not-allowed' : 'text',
+              }}
               required
             />
+            {codeLocked && (
+              <div style={{ ...MONO, color: 'rgba(244,231,208,0.35)', marginTop: 6, letterSpacing: '0.08em' }}>
+                Al gebruikt in {editing.used_count} bestelling(en) — de code zelf
+                ligt vast. Zet hem op inactief om hem te stoppen.
+              </div>
+            )}
           </div>
           <div style={s.fieldGroup}>
             <label style={s.label}>Beschrijving</label>
@@ -352,14 +428,44 @@ function NewCodeForm({ onCreated, tiers }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <label style={{ ...s.label, margin: 0 }}>Direct actief</label>
+          <label style={{ ...s.label, margin: 0 }}>{editing ? 'Actief' : 'Direct actief'}</label>
           <ActiveToggle active={form.is_active} onChange={v => set('is_active', v)} />
         </div>
 
-        <button type="submit" disabled={saving} style={{ ...s.btnPrimary, opacity: saving ? 0.6 : 1 }}>
-          {saving ? 'Opslaan…' : 'Code aanmaken'}
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button type="submit" disabled={saving} style={{ ...s.btnPrimary, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Opslaan…' : editing ? 'Wijzigingen opslaan' : 'Code aanmaken'}
+          </button>
+          {editing && (
+            <button type="button" onClick={onCancel} disabled={saving} style={s.btnSecondary}>
+              Annuleer
+            </button>
+          )}
+        </div>
       </form>
+    </div>
+  );
+}
+
+// ─── Edit modal ───────────────────────────────────────────────────────────────
+
+function EditModal({ code, tiers, onSaved, onClose }) {
+  return (
+    <div style={s.modalBackdrop} onClick={onClose}>
+      <div style={s.modal} onClick={e => e.stopPropagation()}>
+        <div style={{ ...MONO, color: 'var(--orange)', opacity: 0.85, marginBottom: 20, textTransform: 'uppercase' }}>
+          Code bewerken — {code.code}
+        </div>
+        {/* key on the row id so switching straight from one code to another
+            re-seeds the form instead of keeping the previous one's values */}
+        <CodeForm
+          key={code.id}
+          editing={code}
+          tiers={tiers}
+          onSaved={onSaved}
+          onCancel={onClose}
+        />
+      </div>
     </div>
   );
 }
@@ -372,6 +478,7 @@ export default function PromoCodeManager() {
   const [loading, setLoading] = useState(true);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [editing, setEditing] = useState(null); // null | the code row being edited
 
   async function loadCodes() {
     setLoading(true);
@@ -411,9 +518,21 @@ export default function PromoCodeManager() {
   async function deleteCode(code) {
     if (!window.confirm(`Code "${code.code}" verwijderen?`)) return;
     setDeletingId(code.id);
-    await supabase.from('promo_codes').delete().eq('id', code.id);
-    setCodes(prev => prev.filter(c => c.id !== code.id));
+    const { error } = await supabase.from('promo_codes').delete().eq('id', code.id);
     setDeletingId(null);
+    if (error) {
+      // orders.promo_code references this row. Deleting a code an order was
+      // bought with would erase the record of the discount that was given, so
+      // Postgres refuses — the row used to just reappear on the next reload with
+      // no explanation.
+      window.alert(
+        (code.used_count ?? 0) > 0
+          ? `"${code.code}" is al gebruikt in ${code.used_count} bestelling(en) en kan niet verwijderd worden. Zet hem op inactief om hem te stoppen.`
+          : `Verwijderen mislukt: ${error.message}`,
+      );
+      return;
+    }
+    setCodes(prev => prev.filter(c => c.id !== code.id));
   }
 
   return (
@@ -422,7 +541,16 @@ export default function PromoCodeManager() {
         <h1 style={s.pageTitle}>Promo codes</h1>
       </div>
 
-      <NewCodeForm onCreated={loadCodes} tiers={tiers} />
+      {editing && (
+        <EditModal
+          code={editing}
+          tiers={tiers}
+          onSaved={() => { setEditing(null); loadCodes(); }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
+      <CodeForm onSaved={loadCodes} tiers={tiers} />
 
       <div style={CARD}>
         <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid rgba(244,231,208,0.07)' }}>
@@ -485,7 +613,13 @@ export default function PromoCodeManager() {
                         disabled={togglingId === code.id}
                       />
                     </td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>
+                    <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        style={{ ...s.btnSecondary, marginRight: 8 }}
+                        onClick={() => setEditing(code)}
+                      >
+                        Bewerk
+                      </button>
                       <button
                         style={{ ...s.btnDanger, opacity: deletingId === code.id ? 0.5 : 1 }}
                         onClick={() => deleteCode(code)}
