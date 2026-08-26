@@ -39,6 +39,11 @@ export default function Hero() {
 
         <Countdown />
 
+        <div className="hero-location-mobile">
+          <span className="mono" style={{ opacity: 0.6, fontSize: 10, letterSpacing: "0.2em" }}>LOCATIE</span>
+          <div style={{ fontFamily: "var(--display)", fontSize: 18, marginTop: 2 }}>Kleine Ganzendries Veld</div>
+        </div>
+
         <div className="hero-cta">
           <a href="#/checkout" className="btn btn-primary">
             Tickets kopen →
@@ -54,7 +59,7 @@ export default function Hero() {
           <div
             style={{ fontFamily: "var(--display)", fontSize: 22, marginTop: 2 }}
           >
-            Kleine Ganzendries, Pellenberg
+            Kleine Ganzendries Veld
           </div>
         </div>
         <div className="right" style={{ textAlign: "right" }}>
