@@ -368,6 +368,16 @@ section { position: relative; padding: 120px 40px; }
   color: var(--cream);
 }
 
+.hero-coords {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--orange-bright);
+  opacity: 0.85;
+  margin-top: 5px;
+  text-transform: uppercase;
+}
+
 .hero-cta {
   display: flex;
   justify-content: center;

@@ -42,6 +42,7 @@ export default function Hero() {
         <div className="hero-location-mobile">
           <span className="mono" style={{ opacity: 0.6, fontSize: 10, letterSpacing: "0.2em" }}>LOCATIE</span>
           <div style={{ fontFamily: "var(--display)", fontSize: 18, marginTop: 2 }}>Kleine Ganzendries Veld</div>
+          <div className="hero-coords">50°52′02″N&nbsp;&nbsp;4°47′22″E</div>
         </div>
 
         <div className="hero-cta">
@@ -61,6 +62,7 @@ export default function Hero() {
           >
             Kleine Ganzendries Veld
           </div>
+          <div className="hero-coords">50°52′02″N&nbsp;&nbsp;4°47′22″E</div>
         </div>
         <div className="right" style={{ textAlign: "right" }}>
           <div className="mono" style={{ opacity: 0.7, fontSize: 10 }}>
