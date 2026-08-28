@@ -1316,8 +1316,12 @@ footer {
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid rgba(244,231,208,0.1);
     padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-    justify-content: space-around; align-items: stretch;
+    align-items: stretch;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .dash-mobile-nav::-webkit-scrollbar { display: none; }
   .dash-main { padding-bottom: 72px !important; }
 
   /* CMS: tabs move to top horizontal bar */

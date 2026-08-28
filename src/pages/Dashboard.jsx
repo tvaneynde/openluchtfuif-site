@@ -1004,12 +1004,15 @@ function DashMobileNav() {
   const items = [
     { to: '/dashboard',              label: 'Home',    icon: '◈' },
     { to: '/dashboard/bestellingen', label: 'Orders',  icon: '≡' },
+    { to: '/dashboard/tickets',      label: 'Tickets', icon: '⬡' },
     { to: '/dashboard/scanner',      label: 'Scanner', icon: '◎' },
     { to: '/dashboard/content',      label: 'Content', icon: '✎' },
-    { to: '/dashboard/tickets',      label: 'Tickets', icon: '⬡' },
+    { to: '/dashboard/emails',       label: 'E-mails', icon: '✉' },
+    { to: '/dashboard/promo',        label: 'Promo',   icon: '%' },
+    { to: '/dashboard/gratis',       label: 'Gratis',  icon: '◇' },
   ];
   return (
-    <nav className="dash-mobile-nav">
+    <nav className="dash-mobile-nav" style={{ overflowX: 'auto', justifyContent: 'flex-start' }}>
       {items.map(item => {
         const active = item.to === '/dashboard'
           ? location.pathname === '/dashboard' || location.pathname === '/dashboard/'
@@ -1017,7 +1020,7 @@ function DashMobileNav() {
         return (
           <button key={item.to} onClick={() => navigate(item.to)} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 3, flex: 1,
+            justifyContent: 'center', gap: 3, flex: '0 0 72px',
             color: active ? 'var(--orange)' : 'rgba(244,231,208,0.45)',
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '6px 4px', transition: 'color 0.2s',
