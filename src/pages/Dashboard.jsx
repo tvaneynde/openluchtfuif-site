@@ -8,6 +8,7 @@ import ScannerConfig from './dashboard/ScannerConfig.jsx';
 import PromoCodeManager from './dashboard/PromoCodeManager.jsx';
 import CompTickets from './dashboard/CompTickets.jsx';
 import ContentManager from './dashboard/ContentManager.jsx';
+import GateOps from './dashboard/GateOps.jsx';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -893,11 +894,13 @@ const inputStyle = {
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
   '/dashboard/': 'Dashboard',
+  '/dashboard/poort': 'Poortcontrole',
   '/dashboard/tickets': 'Tickets',
   '/dashboard/bestellingen': 'Bestellingen',
   '/dashboard/emails': 'E-mails',
   '/dashboard/scanner': 'Scanner',
   '/dashboard/promo': 'Promo codes',
+  '/dashboard/gratis': 'Gratis tickets',
   '/dashboard/content': 'Content',
 };
 
@@ -1003,6 +1006,7 @@ function DashMobileNav() {
   const navigate = useNavigate();
   const items = [
     { to: '/dashboard',              label: 'Home',    icon: '◈' },
+    { to: '/dashboard/poort',        label: 'Poort',   icon: '◐' },
     { to: '/dashboard/bestellingen', label: 'Orders',  icon: '≡' },
     { to: '/dashboard/tickets',      label: 'Tickets', icon: '⬡' },
     { to: '/dashboard/scanner',      label: 'Scanner', icon: '◎' },
@@ -1080,6 +1084,7 @@ function Sidebar({ onSignOut }) {
       {/* Nav */}
       <nav style={{ flex: 1, padding: '20px 0 20px 0' }}>
         <NavItem to="/dashboard" label="Dashboard" icon="◈" />
+        <NavItem to="/dashboard/poort" label="Poortcontrole" icon="◐" />
         <NavItem to="/dashboard/tickets" label="Tickets" icon="⬡" />
         <NavItem to="/dashboard/bestellingen" label="Bestellingen" icon="≡" />
         <NavItem to="/dashboard/emails" label="E-mails" icon="✉" />
@@ -1234,6 +1239,7 @@ export default function Dashboard() {
         <main style={{ flex: 1 }}>
           <Routes>
             <Route index element={<Overview />} />
+            <Route path="poort" element={<GateOps />} />
             <Route path="tickets" element={<TierManagement />} />
             <Route path="bestellingen" element={<OrdersTable />} />
             <Route path="emails" element={<EmailLog />} />
